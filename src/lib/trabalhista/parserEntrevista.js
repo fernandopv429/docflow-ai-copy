@@ -75,7 +75,7 @@ const CASO_SCHEMA = {
   },
 };
 
-export async function extrairCasoDeTexto(texto) {
+export async function extrairCasoDeTexto(texto, fileUrls) {
   const request = {
     prompt: `Você é um extrator de dados de entrevistas trabalhistas. Leia o texto livre abaixo (resumo da entrevista feito pelo advogado) e preencha os campos do caso.
 
@@ -97,6 +97,7 @@ Responda APENAS com o objeto JSON.`,
     model: 'gemini_3_flash',
     response_json_schema: CASO_SCHEMA,
   };
+  if (fileUrls?.length) request.file_urls = fileUrls;
   const dados = await traceAiCall('Extração estruturada do caso', request, () =>
     base44.integrations.Core.InvokeLLM(request)
   );
