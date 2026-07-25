@@ -1,25 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText, AlertTriangle,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
 import SessionLogsModal from '@/components/SessionLogsModal';
 import DocumentReviewPreview from '@/components/DocumentReviewPreview';
-import { exportToDocx } from '@/lib/exportDocx';
 import { exportarDocxTemplate } from '@/lib/preencherDocxTemplate';
-import { montarDadosTemplate } from '@/lib/trabalhista/dadosTemplate';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
 import {
-  carregarModeloPadrao,
   conversarEntrevista,
-  gerarPecaPadrao,
+  gerarDadosPeca,
   verificarCoerencia,
 } from '@/lib/trabalhista/modelosReferencia';
+import {
+  carregarEsqueletoTemplate,
+  preencherEsqueleto,
+  textoDaPeca,
+} from '@/lib/trabalhista/previewTemplate';
 
 export default function GerarPorEntrevista() {
   const [messages, setMessages] = useState([]);
@@ -37,18 +39,15 @@ export default function GerarPorEntrevista() {
 
   const [allUrls, setAllUrls] = useState([]);
   const [documentSources, setDocumentSources] = useState([]);
-  const [modeloPadrao, setModeloPadrao] = useState(null);
   const [attrs, setAttrs] = useState(null);
   const [config, setConfig] = useState(null);
   const [ultimaGeracao, setUltimaGeracao] = useState(null);
 
-  // Documento vivo (painel à direita)
+  // Documento vivo (painel à direita) — preview do template .docx preenchido
   const [docHtml, setDocHtml] = useState('');
   const endRef = useRef(null);
 
-  useEffect(() => {
-    carregarModeloPadrao().then(setModeloPadrao).catch(() => {});
-  }, []);
+  const temTemplate = !!config?.template_docx_url;
 
   useEffect(() => {
     base44.entities.IntegracaoConfig.list('-updated_date', 1).then((l) => setConfig(l?.[0] || null)).catch(() => {});
@@ -92,28 +91,41 @@ export default function GerarPorEntrevista() {
   }, [input, userText]);
 
   const gerarMinuta = async (opts = {}) => {
-    if (!modeloPadrao || generating) return;
+    if (generating) return;
     setGenerating(true);
-    setMessages((m) => [...m, { role: 'tool', text: `Usando template principal: ${modeloPadrao.titulo}` }]);
     try {
       const geracaoTexto = opts.texto ?? userText;
-      const { html, dadosReceita, dadosCep, dadosDatajud, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
+      const { dados, dadosReceita, dadosCep, dadosDatajud, calculos, caso, modeloSemelhante } = await gerarDadosPeca({
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
-        modeloPadrao,
-        force: opts.force,
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
+
+      // Preview a partir do próprio template .docx (fonte única)
+      let html = '';
+      let documentoTexto = '';
+      if (config?.template_docx_url) {
+        try {
+          const esqueleto = await carregarEsqueletoTemplate(config.template_docx_url);
+          html = preencherEsqueleto(esqueleto, dados, { highlight: true });
+          documentoTexto = textoDaPeca(esqueleto, dados);
+        } catch (e) {
+          console.error(e);
+          setMessages((m) => [...m, { role: 'assistant', text: `Não consegui carregar o template .docx para o preview: ${e.message || 'verifique o arquivo em Configurações.'}` }]);
+        }
+      }
       setDocHtml(html);
-      setUltimaGeracao({ caso, calculos, dadosReceita });
+      setUltimaGeracao({ caso, calculos, dados, dadosReceita });
       setReviewConfirmed(false);
+
       const retornos = [
         dadosReceita?.length && { role: 'tool_result', title: 'Retorno da Receita Federal (BrasilAPI)', text: JSON.stringify(dadosReceita, null, 2) },
         dadosCep?.length && { role: 'tool_result', title: 'Retorno da consulta de CEP', text: JSON.stringify(dadosCep, null, 2) },
         dadosDatajud?.length && { role: 'tool_result', title: 'Retorno do DataJud/CNJ', text: JSON.stringify(dadosDatajud, null, 2) },
         caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
         calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
+        { role: 'tool_result', title: 'Dados e flags aplicados ao template', text: JSON.stringify(dados, null, 2) },
         modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
         {
           role: 'tool_result',
@@ -121,7 +133,6 @@ export default function GerarPorEntrevista() {
           text: JSON.stringify(fontesGeracao({
             texto: geracaoTexto,
             documentos: opts.sources ?? documentSources,
-            template: modeloPadrao,
             referencia: modeloSemelhante,
             dadosReceita,
             dadosCep,
@@ -132,9 +143,9 @@ export default function GerarPorEntrevista() {
       if (retornos.length) setMessages((m) => [...m, ...retornos]);
 
       const verificados = (dadosReceita || []).filter((d) => !d.erro);
-      let nota = docHtml
-        ? 'Documento atualizado com base no modelo padrão. Veja as mudanças ao lado.'
-        : 'Minuta gerada com base no modelo padrão. Veja o documento ao lado.';
+      let nota = temTemplate
+        ? 'Dados aplicados ao template. Confira os campos destacados no documento ao lado.'
+        : 'Dados extraídos. Envie o template .docx em Configurações para gerar e exportar a petição.';
       if (verificados.length) {
         nota += ` CNPJ(s) confirmado(s) na Receita: ${verificados.map((d) => `${d.razao_social} (${d.cnpj})`).join('; ')}.`;
       }
@@ -144,10 +155,10 @@ export default function GerarPorEntrevista() {
       }
       setMessages((m) => [...m, { role: 'assistant', text: nota }]);
 
-      // Verificação de coerência jurídica da minuta (LLM audita, não reescreve)
-      setMessages((m) => [...m, { role: 'tool', text: 'Verificando coerência jurídica da minuta...' }]);
+      // Verificação de coerência jurídica (LLM audita, não reescreve)
+      setMessages((m) => [...m, { role: 'tool', text: 'Verificando coerência jurídica da peça...' }]);
       try {
-        const verif = await verificarCoerencia({ texto: geracaoTexto, caso, html });
+        const verif = await verificarCoerencia({ texto: geracaoTexto, caso, dados, documentoTexto });
         const alertas = verif?.alertas || [];
         const icone = { BLOQUEANTE: '⛔', ATENCAO: '⚠️', INFO: 'ℹ️' };
         const cabecalho = `Verificação de coerência — status: ${verif?.status || 'concluída'}.`;
@@ -162,7 +173,6 @@ export default function GerarPorEntrevista() {
             title: 'Fontes consultadas nesta auditoria',
             text: JSON.stringify(fontesAuditoria({
               texto: geracaoTexto,
-              template: modeloPadrao,
               referencia: modeloSemelhante,
             }), null, 2),
           },
@@ -173,7 +183,7 @@ export default function GerarPorEntrevista() {
       }
     } catch (err) {
       console.error(err);
-      setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a minuta. Tente novamente.' }]);
+      setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a peça. Tente novamente.' }]);
     }
     setGenerating(false);
   };
@@ -207,11 +217,10 @@ export default function GerarPorEntrevista() {
       const transcript = novasMsgs
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, text: m.text || '' }));
-      const modelosCtx = modeloPadrao ? [{ titulo: modeloPadrao.titulo, teses: [] }] : [];
       const res = await conversarEntrevista({
         transcript,
         fileUrls: urls,
-        modelos: modelosCtx,
+        modelos: [],
         attrsAtuais: attrs || {},
       });
 
@@ -238,13 +247,13 @@ export default function GerarPorEntrevista() {
         },
       ]);
 
-      // Inicia a geração/atualização da minuta automaticamente após cada envio
+      // Inicia a geração/atualização automaticamente após cada envio
       const textoCompleto = novasMsgs
         .filter((m) => m.role === 'user')
         .map((m) => m.text)
         .filter(Boolean)
         .join('\n\n');
-      if (res?.pronto_para_gerar || docHtml) {
+      if (res?.pronto_para_gerar || docHtml || ultimaGeracao) {
         await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
       }
     } catch (err) {
@@ -261,32 +270,14 @@ export default function GerarPorEntrevista() {
     }
   };
 
-  const exportarFiel = async () => {
-    if (!config?.template_docx_url || !ultimaGeracao || exporting) return;
-    setExporting(true);
-    try {
-      const dados = montarDadosTemplate({ ...ultimaGeracao, attrs });
-      await exportarDocxTemplate(config.template_docx_url, dados, 'Petição inicial');
-    } catch (err) {
-      console.error(err);
-      setMessages((m) => [...m, { role: 'assistant', text: `Erro ao exportar fiel ao modelo: ${err.message || 'verifique o template .docx e as tags.'}` }]);
-    }
-    setExporting(false);
-  };
-
   const exportar = async () => {
-    if (!docHtml || !reviewConfirmed || exporting) return;
+    if (!temTemplate || !ultimaGeracao || !reviewConfirmed || exporting) return;
     setExporting(true);
     try {
-      const validacao = await exportToDocx(docHtml, null, 'Minuta - petição inicial');
-      setMessages((m) => [...m, {
-        role: 'tool_result',
-        title: 'Validação da exportação DOCX',
-        text: JSON.stringify(validacao, null, 2),
-      }]);
+      await exportarDocxTemplate(config.template_docx_url, ultimaGeracao.dados, 'Petição inicial');
     } catch (err) {
       console.error(err);
-      window.alert(`Não foi possível exportar o documento: ${err?.message || 'erro desconhecido'}`);
+      window.alert(`Não foi possível exportar o documento: ${err?.message || 'verifique o template .docx e as tags.'}`);
     } finally {
       setExporting(false);
     }
@@ -302,7 +293,7 @@ export default function GerarPorEntrevista() {
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-[#202124]">Gerar por Entrevista</h1>
           <p className="text-xs text-[#5f6368] truncate">
-            Converse à esquerda; a minuta aparece e se atualiza à direita.
+            Converse à esquerda; a petição preenche o template ao lado e é exportada fiel ao .docx.
           </p>
         </div>
         <button
@@ -317,12 +308,18 @@ export default function GerarPorEntrevista() {
         </Link>
       </div>
 
-      {/* Barra do modelo padrão */}
+      {/* Barra do template .docx */}
       <div className="flex flex-wrap items-center gap-2 px-6 py-2 border-b border-[#f1f3f4] bg-white flex-shrink-0">
-        <span className="text-xs text-[#5f6368]">Template principal:</span>
-        <span className="text-xs font-medium text-[#202124] truncate max-w-[420px]">
-          {modeloPadrao?.titulo || 'carregando...'}
-        </span>
+        <span className="text-xs text-[#5f6368]">Template .docx:</span>
+        {temTemplate ? (
+          <span className="text-xs font-medium text-[#0b8043] truncate max-w-[420px]">
+            {config.template_docx_nome || 'enviado'}
+          </span>
+        ) : (
+          <Link to="/modelos" className="text-xs font-medium text-[#c5221f] hover:underline">
+            nenhum — enviar em Configurações
+          </Link>
+        )}
         {attrs && (attrs.funcao || attrs.tipo_dispensa) && (
           <span className="text-[11px] text-[#9aa0a6]">
             {attrs.funcao || '—'} · {TIPO_DISPENSA_LABELS[attrs.tipo_dispensa]?.split('(')[0]?.trim() || attrs.tipo_dispensa || '—'}
@@ -330,7 +327,7 @@ export default function GerarPorEntrevista() {
         )}
         {generating && (
           <span className="ml-auto flex items-center gap-1.5 text-xs text-[#1a73e8]">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Gerando minuta...
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Preenchendo a peça...
           </span>
         )}
       </div>
@@ -381,7 +378,7 @@ export default function GerarPorEntrevista() {
                 <div className="flex justify-start">
                   <div className="flex items-center gap-2 px-3.5 py-2 bg-white border border-[#dadce0] rounded-2xl rounded-bl-sm text-sm text-[#5f6368]">
                     <Loader2 className="w-4 h-4 animate-spin text-[#1a73e8]" />
-                    {generating ? 'Redigindo o documento...' : 'Pensando...'}
+                    {generating ? 'Preenchendo o documento...' : 'Pensando...'}
                   </div>
                 </div>
               )}
@@ -445,20 +442,15 @@ export default function GerarPorEntrevista() {
         <div className="flex flex-col min-h-0 flex-1 bg-[#f1f3f4]">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#dadce0] bg-white flex-shrink-0">
             <FileText className="w-4 h-4 text-[#1a73e8]" />
-            <span className="text-sm font-medium text-[#202124] truncate flex-1">Minuta</span>
-            {generating && (
-              <span className="flex items-center gap-1 text-[11px] text-[#1a73e8]">
-                <RefreshCw className="w-3 h-3 animate-spin" /> atualizando
-              </span>
-            )}
+            <span className="text-sm font-medium text-[#202124] truncate flex-1">Petição</span>
             {docHtml && (
               <button
-                onClick={() => gerarMinuta({ force: true })}
+                onClick={() => gerarMinuta()}
                 disabled={generating}
-                title="Gerar uma nova versão (ignora o cache)"
+                title="Reaplicar os dados ao template"
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-[#dadce0] text-[#3c4043] rounded-lg text-xs font-medium hover:bg-[#f1f3f4] transition-colors disabled:opacity-40"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Regerar
+                <RefreshCw className="w-3.5 h-3.5" /> Atualizar
               </button>
             )}
             {docHtml && !reviewConfirmed && (
@@ -474,21 +466,11 @@ export default function GerarPorEntrevista() {
                 <CheckCircle2 className="w-3.5 h-3.5" /> Confirmar revisão
               </button>
             )}
-            {config?.template_docx_url && (
-              <button
-                onClick={exportarFiel}
-                disabled={!docHtml || !ultimaGeracao || exporting}
-                title="Preenche o template .docx oficial — formatação 100% fiel"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b8043] text-white rounded-lg text-xs font-medium hover:bg-[#0a7038] transition-colors disabled:opacity-40"
-              >
-                <FileDown className="w-3.5 h-3.5" /> Exportar fiel ao modelo
-              </button>
-            )}
             <button
               onClick={exportar}
-              disabled={!docHtml || !reviewConfirmed || exporting}
-              title={!reviewConfirmed ? 'Confirme a revisão antes de exportar' : 'Exportar DOCX'}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a73e8] text-white rounded-lg text-xs font-medium hover:bg-[#1557b0] transition-colors disabled:opacity-40"
+              disabled={!temTemplate || !ultimaGeracao || !reviewConfirmed || exporting}
+              title={!temTemplate ? 'Envie o template .docx em Configurações' : !reviewConfirmed ? 'Confirme a revisão antes de exportar' : 'Exportar DOCX fiel ao modelo'}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b8043] text-white rounded-lg text-xs font-medium hover:bg-[#0a7038] transition-colors disabled:opacity-40"
             >
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
               {exporting ? 'Exportando...' : 'Exportar DOCX'}
@@ -496,13 +478,22 @@ export default function GerarPorEntrevista() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 min-h-0 relative">
-            {docHtml ? (
+            {!temTemplate ? (
+              <div className="h-full flex flex-col items-center justify-center text-center">
+                <AlertTriangle className="w-10 h-10 text-[#e0a800] mb-3" />
+                <p className="text-sm text-[#5f6368]">Nenhum template .docx configurado.</p>
+                <p className="text-xs text-[#9aa0a6] mt-1">
+                  Envie o modelo oficial (marcado com as tags) em{' '}
+                  <Link to="/modelos" className="text-[#1a73e8] hover:underline">Configurações</Link>.
+                </p>
+              </div>
+            ) : docHtml ? (
               <DocumentReviewPreview html={docHtml} dimmed={generating} />
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <FileText className="w-10 h-10 text-[#dadce0] mb-3" />
-                <p className="text-sm text-[#5f6368]">A minuta aparecerá aqui.</p>
-                <p className="text-xs text-[#9aa0a6] mt-1">Envie a entrevista à esquerda — a minuta será gerada automaticamente.</p>
+                <p className="text-sm text-[#5f6368]">A petição preenchida aparecerá aqui.</p>
+                <p className="text-xs text-[#9aa0a6] mt-1">Envie a entrevista à esquerda — o template será preenchido automaticamente.</p>
               </div>
             )}
             {generating && docHtml && (
