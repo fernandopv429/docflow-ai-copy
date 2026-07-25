@@ -1,0 +1,64 @@
+{
+  "name": "Template",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "title": "T\u00edtulo"
+    },
+    "description": {
+      "type": "string",
+      "title": "Descri\u00e7\u00e3o"
+    },
+    "content": {
+      "type": "string",
+      "title": "Conte\u00fado"
+    },
+    "content_url": {
+      "type": "string",
+      "title": "URL do Conte\u00fado"
+    },
+    "skill": {
+      "type": "string",
+      "title": "Skill da IA"
+    },
+    "web_search": {
+      "type": "boolean",
+      "default": false,
+      "title": "Buscar na Internet"
+    },
+    "search_sites": {
+      "type": "string",
+      "title": "Sites Priorit\u00e1rios"
+    },
+    "is_default": {
+      "type": "boolean",
+      "default": false,
+      "title": "Modelo padr\u00e3o"
+    },
+    "variables": {
+      "type": "array",
+      "title": "Vari\u00e1veis",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "description": {
+            "type": "string",
+            "title": "Descri\u00e7\u00e3o"
+          },
+          "example": {
+            "type": "string",
+            "title": "Exemplo"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "title"
+  ]
+}

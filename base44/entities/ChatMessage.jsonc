@@ -1,0 +1,35 @@
+{
+  "name": "ChatMessage",
+  "type": "object",
+  "properties": {
+    "template_id": {
+      "type": "string",
+      "title": "Template ID"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "user",
+        "assistant"
+      ],
+      "title": "Papel"
+    },
+    "text": {
+      "type": "string",
+      "title": "Mensagem"
+    },
+    "corrected_values": {
+      "type": "object",
+      "title": "Valores Corrigidos"
+    },
+    "skill_suggestion": {
+      "type": "string",
+      "title": "Sugest\u00e3o de Skill"
+    }
+  },
+  "required": [
+    "template_id",
+    "role",
+    "text"
+  ]
+}

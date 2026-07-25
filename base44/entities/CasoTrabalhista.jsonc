@@ -1,0 +1,250 @@
+{
+  "name": "CasoTrabalhista",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "title": "T\u00edtulo"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "rascunho",
+        "em_analise",
+        "auditado",
+        "gerado",
+        "revisao",
+        "pronto"
+      ],
+      "default": "rascunho",
+      "title": "Status"
+    },
+    "entrevista_texto": {
+      "type": "string",
+      "title": "Texto da Entrevista"
+    },
+    "recl_nome": {
+      "type": "string",
+      "title": "Nome do Reclamante"
+    },
+    "recl_cpf": {
+      "type": "string",
+      "title": "CPF"
+    },
+    "recl_rg": {
+      "type": "string",
+      "title": "RG"
+    },
+    "recl_pis": {
+      "type": "string",
+      "title": "PIS"
+    },
+    "recl_ctps": {
+      "type": "string",
+      "title": "CTPS"
+    },
+    "recl_endereco": {
+      "type": "string",
+      "title": "Endere\u00e7o do Reclamante"
+    },
+    "recl1_nome": {
+      "type": "string",
+      "title": "1\u00aa Reclamada - Nome"
+    },
+    "recl1_cnpj": {
+      "type": "string",
+      "title": "1\u00aa Reclamada - CNPJ"
+    },
+    "recl1_logradouro": {
+      "type": "string",
+      "title": "1\u00aa Reclamada - Logradouro"
+    },
+    "recl1_complemento": {
+      "type": "string",
+      "title": "1\u00aa Reclamada - Complemento"
+    },
+    "recl2_nome": {
+      "type": "string",
+      "title": "2\u00aa Reclamada - Nome"
+    },
+    "recl2_cnpj": {
+      "type": "string",
+      "title": "2\u00aa Reclamada - CNPJ"
+    },
+    "recl3_nome": {
+      "type": "string",
+      "title": "3\u00aa Reclamada - Nome"
+    },
+    "recl3_cnpj": {
+      "type": "string",
+      "title": "3\u00aa Reclamada - CNPJ"
+    },
+    "data_admissao": {
+      "type": "string",
+      "format": "date",
+      "title": "Data de Admiss\u00e3o"
+    },
+    "data_rescisao": {
+      "type": "string",
+      "format": "date",
+      "title": "Data de Rescis\u00e3o"
+    },
+    "funcao": {
+      "type": "string",
+      "title": "Fun\u00e7\u00e3o"
+    },
+    "salario": {
+      "type": "number",
+      "title": "Sal\u00e1rio"
+    },
+    "jornada_horario": {
+      "type": "string",
+      "title": "Jornada/Hor\u00e1rio"
+    },
+    "jornada_extrapola": {
+      "type": "boolean",
+      "title": "Jornada Extrapola"
+    },
+    "jornada_freq_extra": {
+      "type": "string",
+      "title": "Frequ\u00eancia de Extras"
+    },
+    "intervalo_gozado": {
+      "type": "boolean",
+      "title": "Intervalo Gozado"
+    },
+    "tipo_dispensa": {
+      "type": "string",
+      "enum": [
+        "sem_justa_causa",
+        "rescisao_indireta",
+        "nulidade_pedido_demissao",
+        "reversao_justa_causa",
+        "acordo"
+      ],
+      "title": "Modalidade de Rescis\u00e3o"
+    },
+    "val_ft": {
+      "type": "number",
+      "title": "Valor Folgas Trabalhadas"
+    },
+    "ft_qtd_media": {
+      "type": "number",
+      "title": "Qtd M\u00e9dia FT"
+    },
+    "val_conducao": {
+      "type": "number",
+      "title": "Valor Condu\u00e7\u00e3o"
+    },
+    "val_alimentacao": {
+      "type": "number",
+      "title": "Valor Alimenta\u00e7\u00e3o"
+    },
+    "comarca_uf": {
+      "type": "string",
+      "title": "Comarca/UF"
+    },
+    "regiao_trt": {
+      "type": "string",
+      "title": "Regi\u00e3o TRT"
+    },
+    "dano_supervisor": {
+      "type": "string",
+      "title": "Dano - Supervisor"
+    },
+    "dano_fatos": {
+      "type": "string",
+      "title": "Dano - Fatos"
+    },
+    "dano_sem_estrutura": {
+      "type": "boolean",
+      "title": "Dano - Sem Estrutura"
+    },
+    "tem_ft": {
+      "type": "boolean",
+      "title": "Tem FT"
+    },
+    "tem_dano_moral": {
+      "type": "boolean",
+      "title": "Tem Dano Moral"
+    },
+    "tem_desvio": {
+      "type": "boolean",
+      "title": "Tem Desvio de Fun\u00e7\u00e3o"
+    },
+    "tem_acumulo": {
+      "type": "boolean",
+      "title": "Tem Ac\u00famulo de Fun\u00e7\u00e3o"
+    },
+    "acumulo_funcao": {
+      "type": "string",
+      "title": "Descri\u00e7\u00e3o Ac\u00famulo"
+    },
+    "tem_insalubridade": {
+      "type": "boolean",
+      "title": "Tem Insalubridade"
+    },
+    "tem_periculosidade": {
+      "type": "boolean",
+      "title": "Tem Periculosidade"
+    },
+    "tem_adic_noturno": {
+      "type": "boolean",
+      "title": "Tem Adicional Noturno"
+    },
+    "document_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "URLs dos Documentos"
+    },
+    "document_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Nomes dos Documentos"
+    },
+    "analise_status": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "em_andamento",
+        "concluida",
+        "erro"
+      ],
+      "default": "pendente",
+      "title": "Status da An\u00e1lise"
+    },
+    "analise_laudo": {
+      "type": "string",
+      "title": "Laudo da An\u00e1lise"
+    },
+    "analise_json": {
+      "type": "object",
+      "title": "Resultado da Auditoria"
+    },
+    "template_id": {
+      "type": "string",
+      "title": "Template Utilizado"
+    },
+    "auditado_em": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Auditado em"
+    },
+    "status_final_auditoria": {
+      "type": "string",
+      "enum": [
+        "bloqueado",
+        "revisar",
+        "aprovado"
+      ],
+      "title": "Status Final da Auditoria"
+    }
+  },
+  "required": [
+    "titulo"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "GeneratedDocument",
+  "type": "object",
+  "properties": {
+    "template_id": {
+      "type": "string",
+      "title": "Template ID"
+    },
+    "template_title": {
+      "type": "string",
+      "title": "T\u00edtulo do Template"
+    },
+    "variable_values": {
+      "type": "object",
+      "title": "Valores das Vari\u00e1veis"
+    },
+    "source_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Arquivos de Origem"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "processing",
+        "completed",
+        "failed"
+      ],
+      "default": "completed",
+      "title": "Status"
+    }
+  },
+  "required": [
+    "template_id"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "EspecialistaConfig",
+  "type": "object",
+  "properties": {
+    "numero": {
+      "type": "string",
+      "title": "N\u00famero"
+    },
+    "nome": {
+      "type": "string",
+      "title": "Nome"
+    },
+    "descricao": {
+      "type": "string",
+      "title": "Descri\u00e7\u00e3o"
+    },
+    "prompt_sistema": {
+      "type": "string",
+      "title": "Prompt de Sistema"
+    },
+    "modelo_ia": {
+      "type": "string",
+      "enum": [
+        "claude_opus_4_6",
+        "claude_sonnet_4_6",
+        "gemini_3_1_pro",
+        "automatic"
+      ],
+      "default": "claude_sonnet_4_6",
+      "title": "Modelo de IA"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "title": "Ativo"
+    }
+  },
+  "required": [
+    "numero",
+    "nome",
+    "prompt_sistema"
+  ]
+}

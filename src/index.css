@@ -1,0 +1,258 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --font-heading: ui-sans-serif, system-ui, sans-serif;
+    --font-body: ui-sans-serif, system-ui, sans-serif;
+    --font-display: ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+}
+
+/* ===== Rich Text Editor - Google Docs Style ===== */
+.doc-editor-content {
+  font-family: Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #202124;
+  padding: 96px;
+  min-height: 800px;
+}
+
+.doc-editor-content .docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: -96px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: #f8f9fa !important;
+}
+
+.doc-editor-content .docx-wrapper > section.docx {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  width: 100% !important;
+  background: white;
+  margin: 0 auto;
+}
+
+.doc-preview .docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background-color: #f8f9fa !important;
+}
+
+.doc-preview .docx-wrapper > section.docx {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  width: 100% !important;
+  background: white;
+  margin: 0 auto;
+}
+
+/* Page division lines for regular (non-imported) editor content — A4 height */
+.doc-editor-content {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 1055px,
+    #f8f9fa 1055px,
+    #f8f9fa 1079px
+  );
+}
+
+.doc-editor-content:empty::before {
+  content: attr(data-placeholder);
+  color: #9aa0a6;
+  pointer-events: none;
+}
+
+.doc-editor-content h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; }
+.doc-editor-content h2 { font-size: 1.25em; font-weight: 700; margin: 0.5em 0; }
+.doc-editor-content h3 { font-size: 1.1em; font-weight: 700; margin: 0.5em 0; }
+.doc-editor-content p { margin: 0.5em 0; }
+.doc-editor-content ul, .doc-editor-content ol { margin: 0.5em 0; padding-left: 2em; }
+.doc-editor-content li { margin: 0.25em 0; }
+.doc-editor-content a { color: #1a73e8; text-decoration: underline; }
+
+/* ===== Variable Highlighting in Preview ===== */
+.var-pending {
+  display: inline-block;
+  background: #e8f0fe;
+  color: #1a73e8;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+.var-filled {
+  color: #202124;
+  font-weight: 500;
+}
+
+/* ===== Document Preview ===== */
+.doc-preview {
+  font-family: Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #202124;
+}
+
+.doc-preview h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0; text-align: center; }
+.doc-preview h2 { font-size: 1.25em; font-weight: 700; margin: 0.5em 0; }
+.doc-preview h3 { font-size: 1.1em; font-weight: 700; margin: 0.5em 0; }
+.doc-preview p { margin: 0.5em 0; }
+.doc-preview ul, .doc-preview ol { margin: 0.5em 0; padding-left: 2em; }
+.doc-preview li { margin: 0.25em 0; }
+.doc-preview strong, .doc-preview b { font-weight: 700; }
+.doc-preview em, .doc-preview i { font-style: italic; }
+.doc-preview u { text-decoration: underline; }
+.doc-preview a { color: #1a73e8; text-decoration: underline; }
+
+/* Campos variáveis preenchidos pela IA — revisão obrigatória antes da exportação */
+.ai-filled-field {
+  background: #fff3b0;
+  color: inherit;
+  border-bottom: 2px solid #e0a800;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+/* Revisão paginada com o mesmo timbrado do DOCX */
+.legal-document-page {
+  padding: 48px 64px 32px;
+  font-family: Arial, sans-serif;
+  font-size: 12pt;
+  line-height: 1.5;
+}
+.legal-document-body p { text-align: justify; }
+.legal-document-review .docx-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.legal-document-review section.docx {
+  position: relative;
+  box-sizing: border-box;
+  margin: 0 auto;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+}
+.legal-document-review section.docx::before {
+  content: '';
+  position: absolute;
+  top: 32px;
+  left: 85.05pt;
+  right: 85.05pt;
+  height: 56px;
+  border-bottom: 1px solid #202124;
+  background: url('https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/4f1847ac3_image.png') center top / 220px 44px no-repeat;
+}
+.legal-document-review section.docx:not(:first-of-type)::before {
+  top: 12px;
+  height: 104px;
+  background-image: url('https://media.base44.com/images/public/6a5a44d24aa52c9fbdd61b1a/fec36cb66_image.png');
+  background-position: right top;
+  background-size: 100px 86px;
+}
+.legal-document-review section.docx::after {
+  content: 'juridico@favadvogados.com.br  |  OAB/SP 320.825';
+  position: absolute;
+  bottom: 24px;
+  left: 85.05pt;
+  right: 85.05pt;
+  border-top: 1px solid #888;
+  padding-top: 5px;
+  color: #555;
+  font: 8pt Arial, sans-serif;
+  text-align: center;
+}

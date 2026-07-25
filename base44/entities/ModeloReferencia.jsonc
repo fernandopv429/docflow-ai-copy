@@ -1,0 +1,94 @@
+{
+  "name": "ModeloReferencia",
+  "type": "object",
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "title": "T\u00edtulo"
+    },
+    "partes": {
+      "type": "string",
+      "title": "Partes (Reclamante \u00d7 Reclamada)"
+    },
+    "funcao": {
+      "type": "string",
+      "title": "Fun\u00e7\u00e3o",
+      "description": "Ex.: Controlador de acesso, Porteiro"
+    },
+    "sindicato": {
+      "type": "string",
+      "title": "Sindicato/Categoria",
+      "default": "SINDEEPRES"
+    },
+    "comarca_uf": {
+      "type": "string",
+      "title": "Comarca/UF"
+    },
+    "regiao_trt": {
+      "type": "string",
+      "title": "Regi\u00e3o TRT"
+    },
+    "rito": {
+      "type": "string",
+      "enum": [
+        "ordinario",
+        "sumarissimo"
+      ],
+      "title": "Rito"
+    },
+    "tipo_dispensa": {
+      "type": "string",
+      "enum": [
+        "sem_justa_causa",
+        "rescisao_indireta",
+        "nulidade_pedido_demissao",
+        "reversao_justa_causa",
+        "acordo"
+      ],
+      "title": "Modalidade de rescis\u00e3o"
+    },
+    "tem_tomadora": {
+      "type": "boolean",
+      "title": "Tem tomadora (responsabilidade subsidi\u00e1ria)",
+      "default": false
+    },
+    "teses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Teses jur\u00eddicas"
+    },
+    "secoes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "title": "Esqueleto de se\u00e7\u00f5es"
+    },
+    "resumo": {
+      "type": "string",
+      "title": "Resumo t\u00e9cnico"
+    },
+    "conteudo": {
+      "type": "string",
+      "title": "Conte\u00fado de refer\u00eancia (anonimizado)"
+    },
+    "arquivo_nome": {
+      "type": "string",
+      "title": "Arquivo de origem"
+    },
+    "arquivo_url": {
+      "type": "string",
+      "title": "URL do DOCX original (Base44 storage)"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "title": "Ativo"
+    }
+  },
+  "required": [
+    "titulo"
+  ]
+}

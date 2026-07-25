@@ -1,0 +1,39 @@
+{
+  "name": "IntegracaoConfig",
+  "type": "object",
+  "properties": {
+    "chave": {
+      "type": "string",
+      "title": "Chave (singleton)",
+      "default": "default"
+    },
+    "cnpj_ativo": {
+      "type": "boolean",
+      "title": "Consulta de CNPJ (BrasilAPI)",
+      "default": true
+    },
+    "cep_ativo": {
+      "type": "boolean",
+      "title": "Consulta de CEP (ViaCEP)",
+      "default": true
+    },
+    "datajud_ativo": {
+      "type": "boolean",
+      "title": "Consulta ao DataJud (CNJ)",
+      "default": false
+    },
+    "datajud_tribunal": {
+      "type": "string",
+      "title": "Tribunal DataJud",
+      "default": "trt2"
+    },
+    "datajud_size": {
+      "type": "number",
+      "title": "Qtd. de processos por busca",
+      "default": 5
+    }
+  },
+  "required": [
+    "chave"
+  ]
+}
