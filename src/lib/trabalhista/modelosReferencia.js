@@ -4,6 +4,7 @@ import { TIPO_DISPENSA_LABELS } from './tokens';
 import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { calcularVerbasCaso } from './mathUtils';
+import { montarDadosTemplate } from './dadosTemplate';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { traceAiCall } from '@/lib/sessionTrace';
@@ -689,7 +690,11 @@ export function limparHtmlIA(html) {
   return removeTextLetterhead(t.trim());
 }
 
-export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, onTool, force = false }) {
+// Motor determinístico: reúne consultas oficiais + extração estruturada +
+// cálculos e devolve o objeto de DADOS que preenche o template (.docx) e o
+// preview. A IA NÃO gera documento — apenas extrai dados e os poucos trechos
+// livres do caso (fatos do dano moral / da rescisão), feito no parser.
+export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
   const notify = (msg) => {
     try {
       onTool?.(msg);
@@ -708,14 +713,14 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     const termos = montarTermosDatajud(attrs);
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
-  // Extração estruturada do caso (parser) para alimentar o cálculo determinístico.
+  const urls = [...(fileUrls || [])];
   if (texto && texto.trim()) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
   const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
     texto && texto.trim()
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey(texto), () => extrairCasoDeTexto(texto), {
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto, fileUrls: urls }), () => extrairCasoDeTexto(texto, urls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({}))
       : Promise.resolve({}),
@@ -724,45 +729,24 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
-  // Seleciona o modelo de referência mais semelhante (matching determinístico) → usa seu diferencial.
+  // Referência mais semelhante (matching determinístico) — informativo.
   let modeloSemelhante = null;
-  let diferencial = '';
   try {
     const modelos = await listarModelosAtivos();
     const ranking = rankearModelos(modelos, attrs || {});
     if (ranking[0] && ranking[0].score > 0) {
       modeloSemelhante = ranking[0].modelo;
-      diferencial = modeloSemelhante.diferencial || modeloSemelhante.conteudo || modeloSemelhante.resumo || '';
       if (modeloSemelhante.titulo) notify(`Referência mais semelhante: ${modeloSemelhante.titulo}`);
     }
   } catch (e) {
     /* segue sem referência */
   }
 
-  const req = {
-    prompt: buildGeracaoPadraoPrompt({
-      texto,
-      attrs,
-      modeloHtml: modeloPadrao?.html || '',
-      calculos,
-      diferencial,
-      modeloSemelhanteTitulo: modeloSemelhante?.titulo || '',
-      dadosReceita,
-      dadosCep,
-      dadosDatajud,
-    }),
-    model: 'claude_sonnet_4_6',
-  };
-  const urls = [...(fileUrls || [])];
-  if (urls.length) req.file_urls = urls;
-  const resultado = await withRuntimeCache(
-    'geracao-minuta',
-    runtimeCacheKey({ prompt: req.prompt, fileUrls: urls }),
-    () => traceAiCall('Geração da minuta', req, () => base44.integrations.Core.InvokeLLM(req)),
-    { onHit: () => notify('Reutilizando geração idêntica em cache...'), force }
-  );
+  // Fonte única de dados para preview e exportação (.docx).
+  const dados = montarDadosTemplate({ caso, calculos, attrs, dadosReceita, dadosCep });
+
   return {
-    html: limparHtmlIA(resultado),
+    dados,
     dadosReceita,
     dadosCep,
     dadosDatajud,
@@ -792,7 +776,7 @@ const COERENCIA_SCHEMA = {
   },
 };
 
-export async function verificarCoerencia({ texto, caso, html }) {
+export async function verificarCoerencia({ texto, caso, dados, documentoTexto }) {
   const prompt = `Você é um auditor jurídico trabalhista. Verifique a MINUTA gerada quanto à COERÊNCIA factual e jurídica com o caso. NÃO reescreva a peça — apenas aponte problemas.
 
 Checagens obrigatórias:
@@ -806,8 +790,9 @@ Checagens obrigatórias:
 Classifique cada alerta: BLOQUEANTE (erro grave), ATENCAO (revisar) ou INFO. Defina "status": "bloqueado" se houver BLOQUEANTE; "revisar" se houver ATENCAO; senão "aprovado".
 
 DADOS DO CASO (estruturado): ${JSON.stringify(caso || {})}
+DADOS/FLAGS DO TEMPLATE (o que foi ligado na peça): ${JSON.stringify(dados || {})}
 RELATO/ENTREVISTA: """${texto || ''}"""
-MINUTA GERADA (HTML): """${html || ''}"""
+${documentoTexto ? `MINUTA GERADA (texto): """${documentoTexto}"""` : ''}
 
 Responda APENAS com o objeto JSON.`;
   const request = {
