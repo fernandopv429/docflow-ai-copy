@@ -24,6 +24,8 @@ const CALC_CAMPO = {
   'Integração de valores por fora': 'VALOR_INTEGRACAO',
   'Auxílio-alimentação nas folgas': 'VALOR_AUX_ALIM_TOTAL',
   'Vale-transporte nas folgas': 'VALOR_VT_TOTAL',
+  'Gratificação de função (10%)': 'VALOR_GRATIFICACAO',
+  'Desvio de função (50%)': 'VALOR_DESVIO',
 };
 
 const TETO_VALOR_CAUSA = 400000;
@@ -176,6 +178,8 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
 
   // 9) Teses (dados de apoio)
   dados.ACUMULO_ATIVIDADES = caso.acumulo_atividades || caso.acumulo_funcao || '';
+  dados.DESVIO_ATIVIDADES = caso.desvio_atividades || '';
+  dados.SALARIOS_ABERTO = caso.salarios_aberto || '';
   dados.ASSIDUIDADE_PROMETIDO = valorOuTexto(caso.assiduidade_prometido);
   dados.ASSIDUIDADE_PAGO = valorOuTexto(caso.assiduidade_pago);
   dados.ASSIDUIDADE_DIFERENCA = valorOuTexto(caso.assiduidade_diferenca);
@@ -208,11 +212,15 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.aviso_reversao = tipo === 'rescisao_indireta' || tipo === 'reversao_justa_causa';
   dados.aviso_normal = tipo === 'sem_justa_causa' || tipo === 'nulidade_pedido_demissao';
   dados.acumulo_funcao = flag(caso.tem_acumulo);
+  dados.desvio_funcao = flag(caso.tem_desvio);
+  dados.gratificacao_funcao = flag(caso.tem_gratificacao);
   dados.escala_12x36 = /12\s*x\s*36/i.test(escalaTxt);
   dados.escala_4x2 = /\b(4\s*x\s*2|6\s*x\s*2)\b/i.test(escalaTxt);
   dados.adicional_noturno = flag(caso.tem_adic_noturno);
   dados.integracao_por_fora = flag(caso.tem_integracao_por_fora);
   dados.periculosidade = flag(caso.tem_periculosidade);
+  dados.dez_minutos_cct = flag(caso.tem_dez_min_cct);
+  dados.salarios_em_aberto = flag(caso.tem_salarios_aberto);
   dados.assiduidade = flag(caso.tem_assiduidade);
   dados.vale_transporte = flag(caso.tem_vale_transporte);
   dados.auxilio_alimentacao = flag(caso.tem_auxilio_alimentacao);
