@@ -203,6 +203,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   // 13) FLAGS — seções condicionais
   const temTomadora = flag(caso.recl2_nome || r2 || attrs.tem_tomadora);
   const escalaTxt = `${caso.escala || ''} ${caso.jornada_horario || ''}`;
+  const ehVigilante = /vigilante/i.test(caso.funcao || attrs.funcao || '');
   dados.tem_tomadora = temTomadora;
   dados.sem_justa_causa = tipo === 'sem_justa_causa';
   dados.rescisao_indireta = tipo === 'rescisao_indireta';
@@ -218,8 +219,9 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.escala_4x2 = /\b(4\s*x\s*2|6\s*x\s*2)\b/i.test(escalaTxt);
   dados.adicional_noturno = flag(caso.tem_adic_noturno);
   dados.integracao_por_fora = flag(caso.tem_integracao_por_fora);
-  dados.periculosidade = flag(caso.tem_periculosidade);
-  dados.dez_minutos_cct = flag(caso.tem_dez_min_cct);
+  // Vigilância: 10 min (cláusula 33ª) e periculosidade nas HE são padrão da categoria.
+  dados.periculosidade = flag(caso.tem_periculosidade) || ehVigilante;
+  dados.dez_minutos_cct = flag(caso.tem_dez_min_cct) || ehVigilante;
   dados.salarios_em_aberto = flag(caso.tem_salarios_aberto);
   dados.assiduidade = flag(caso.tem_assiduidade);
   dados.vale_transporte = flag(caso.tem_vale_transporte);
@@ -229,6 +231,21 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.pensao_vitalicia = flag(caso.tem_pensao);
   dados.folgas_trabalhadas = flag(caso.tem_ft || caso.val_ft || caso.ft_qtd_media);
   dados.tem_ferias_vencidas = flag(caso.tem_ferias_vencidas);
+
+  // Fallback dos pedidos: tese ligada mas valor não calculado -> "a apurar em liquidação"
+  // (evita pedido em branco, ex.: folgas sem valor por folga informado).
+  const APURAR = 'a apurar em liquidação';
+  dados.FT_100 = (dados.VALOR_FT || dados.VALOR_DSR)
+    ? [dados.VALOR_FT, dados.VALOR_DSR].filter(Boolean).join(' + ')
+    : APURAR;
+  for (const [fl, cp] of [
+    ['acumulo_funcao', 'VALOR_ACUMULO'], ['gratificacao_funcao', 'VALOR_GRATIFICACAO'],
+    ['desvio_funcao', 'VALOR_DESVIO'], ['assiduidade', 'VALOR_ASSIDUIDADE'],
+    ['integracao_por_fora', 'VALOR_INTEGRACAO'], ['auxilio_alimentacao', 'VALOR_AUX_ALIM_TOTAL'],
+    ['vale_transporte', 'VALOR_VT_TOTAL'],
+  ]) {
+    if (dados[fl] && !dados[cp]) dados[cp] = APURAR;
+  }
 
   return dados;
 }
