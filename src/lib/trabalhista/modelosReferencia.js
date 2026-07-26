@@ -1,12 +1,10 @@
 import { base44 } from '@/api/base44Client';
 import mammoth from 'mammoth';
 import { TIPO_DISPENSA_LABELS } from './tokens';
-import { loadTemplateContent } from '@/lib/templateContent';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { calcularVerbasCaso } from './mathUtils';
 import { montarDadosTemplate } from './dadosTemplate';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
-import { removeTextLetterhead } from '@/lib/removeTextLetterhead';
 import { traceAiCall } from '@/lib/sessionTrace';
 
 // ============================================================
@@ -86,19 +84,6 @@ export async function listarModelosAtivos() {
     const todos = await base44.entities.ModeloReferencia.list('-updated_date', 100);
     return todos.filter((m) => m.ativo !== false);
   }, { ttlMs: 5 * 60 * 1000 });
-}
-
-// Carrega o Único MODELO PADRÃO (de "Meus Templates") — traç o HTML formatado
-// (estilo/layout do escritório) que serve de base para a minuta.
-export async function carregarModeloPadrao() {
-  const templates = await base44.entities.Template.list('-updated_date', 100);
-  const padrao =
-    templates.find((t) => t.is_default === true) ||
-    templates.find((t) => /modelo\s*padr[aã]o/i.test(t.title || '')) ||
-    templates[0];
-  if (!padrao) return null;
-  const html = await loadTemplateContent(padrao);
-  return { id: padrao.id, titulo: padrao.title, html: html || '' };
 }
 
 // Distila de uma peça o que é PARTICULAR (diferencial), ignorando o texto padrão comum.
@@ -678,16 +663,6 @@ Atributos detectados: função=${attrs?.funcao || '-'}, modalidade=${attrs?.tipo
 === FIM DA ENTREVISTA ===${blocoReceita(dadosReceita)}${blocoCeps(dadosCep)}${blocoDatajud(dadosDatajud)}${blocoCalculos(calculos)}
 
 FORMATO DE SAÍDA: retorne APENAS o HTML adaptado do corpo da petição (sem <html>, <head> ou <body>), PRESERVANDO a formatação/estilo do modelo. NÃO acrescente avisos, notas ou observações ao final.`;
-}
-
-// Limpa a saída da IA: remove cercas de código markdown (```html) e tags de
-// envelope (<html>/<head>/<body>) que aparecem como texto no preview/export.
-export function limparHtmlIA(html) {
-  let t = typeof html === 'string' ? html : String(html || '');
-  t = t.replace(/```[a-z]*\n?/gi, '');
-  t = t.replace(/<\/?(?:html|head|body|!doctype)[^>]*>/gi, '');
-  t = t.replace(/<p>\s*<em>\s*⚠️[^<]*<\/em>\s*<\/p>/gi, '');
-  return removeTextLetterhead(t.trim());
 }
 
 // Motor determinístico: reúne consultas oficiais + extração estruturada +
