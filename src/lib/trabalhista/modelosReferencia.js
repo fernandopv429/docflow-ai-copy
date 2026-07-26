@@ -382,16 +382,6 @@ export async function enriquecerCnpjs(cnpjs) {
   return withRuntimeCache('cnpj', key, () => Promise.all(unicos.map(consultarCnpj)), { ttlMs: 60 * 60 * 1000 });
 }
 
-function blocoReceita(dados) {
-  if (!dados?.length) return '';
-  const linhas = dados.map((d) =>
-    d.erro
-      ? `- CNPJ ${d.cnpj}: ${d.erro} — use o marcador [CNPJ - confirmar].`
-      : `- ${d.razao_social} — CNPJ ${d.cnpj}, ${d.endereco}, CEP ${d.cep} (situação cadastral: ${d.situacao}).`
-  );
-  return `\n\nDADOS OFICIAIS DAS RECLAMADAS (verificados na Receita Federal via BrasilAPI — USE ESTES dados exatos na qualificação das reclamadas, com a razão social e o endereço oficiais):\n${linhas.join('\n')}`;
-}
-
 // ============================================================
 // Consulta de CEP (ViaCEP, com fallback BrasilAPI) — determinística.
 // Completa o endereço do reclamante e do local de prestação (competência).
@@ -465,16 +455,6 @@ export async function enriquecerCeps(ceps) {
   return withRuntimeCache('cep', key, () => Promise.all(unicos.map(consultarCep)), { ttlMs: 60 * 60 * 1000 });
 }
 
-function blocoCeps(dados) {
-  if (!dados?.length) return '';
-  const linhas = dados.map((d) =>
-    d.erro
-      ? `- CEP ${d.cep}: ${d.erro} — confirme o endereço.`
-      : `- CEP ${d.cep}: ${[d.logradouro, d.bairro, [d.municipio, d.uf].filter(Boolean).join('/')].filter(Boolean).join(', ')}.`
-  );
-  return `\n\nENDEREÇOS VERIFICADOS POR CEP (ViaCEP — use para completar logradouro/bairro/município/UF na qualificação; o município orienta a Vara do Trabalho e o UF o TRT da competência):\n${linhas.join('\n')}`;
-}
-
 // ============================================================
 // Configuração das integrações (liga/desliga cada tool). Singleton.
 // ============================================================
@@ -534,21 +514,6 @@ export async function enriquecerDatajud(attrs, config) {
       })
     )
   ), { ttlMs: 30 * 60 * 1000 });
-}
-
-function blocoDatajud(resultados) {
-  const comHits = (resultados || []).filter((r) => r && !r.erro && r.hits?.length);
-  if (!comHits.length) return '';
-  const linhas = comHits.map((r) => {
-    const exemplos = r.hits.slice(0, 3).map((h) => {
-      const numero = h.numero || h.numeroProcesso || '?';
-      const classe = h.classe || (h.classe && h.classe.nome) || '-';
-      const assuntos = (h.assuntos || []).map((a) => (typeof a === 'string' ? a : a.nome)).slice(0, 2);
-      return `${numero} — ${classe}${assuntos.length ? ` (${assuntos.join(', ')})` : ''}`;
-    });
-    return `- Tema "${r.termo}": ${exemplos.join('; ')}`;
-  });
-  return `\n\nCONTEXTO JURISPRUDENCIAL (DataJud/CNJ — mostra que o tema é recorrente no tribunal; use só como reforço argumentativo, NÃO cite números de processo específicos sem conferência humana):\n${linhas.join('\n')}`;
 }
 
 // Motor determinístico: reúne consultas oficiais + extração estruturada +
