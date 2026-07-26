@@ -28,13 +28,17 @@ const COERENCIA_SCHEMA = {
 export async function verificarCoerencia({ texto, caso, dados, documentoTexto }) {
   const prompt = `Você é um auditor jurídico trabalhista. Verifique a MINUTA gerada quanto à COERÊNCIA factual e jurídica com o caso. NÃO reescreva a peça — apenas aponte problemas.
 
-Checagens obrigatórias:
+Checagens obrigatórias (padrão FAV Advogados):
 - Tese/pedido SEM suporte no relato (ex.: adicional noturno sem jornada noturna; periculosidade/insalubridade sem exposição relatada; horas extras sem alegação de sobrejornada).
 - Verba pedida em DUPLICIDADE.
 - Marcadores entre colchetes [ ] ainda pendentes (dados que faltam preencher).
 - Modalidade de rescisão incompatível com os pedidos.
-- Valor da causa acima de R$ 400.000,00.
-- Ausência de tópico obrigatório (ex.: responsabilidade subsidiária quando há tomadora).
+- Valor da causa acima de R$ 400.000,00 (teto).
+- Cada causa de pedir tem PEDIDO correspondente em "DOS PEDIDOS", e vice-versa.
+- Dano moral: presença de ao menos UM elemento concreto do caso e valor = 10x a maior remuneração na função.
+- Ausência de tópico obrigatório (ex.: responsabilidade subsidiária/Súm. 331 quando há tomadora).
+- Concordância de GÊNERO coerente com o(a) reclamante (o/a, dispensado/a, obreiro/a etc.).
+- Conferência de CNPJ, endereço, competência (art. 651) e CCT/vigência.
 
 Classifique cada alerta: BLOQUEANTE (erro grave), ATENCAO (revisar) ou INFO. Defina "status": "bloqueado" se houver BLOQUEANTE; "revisar" se houver ATENCAO; senão "aprovado".
 
