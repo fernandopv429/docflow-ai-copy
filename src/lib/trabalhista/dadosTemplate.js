@@ -1,4 +1,4 @@
-import { formatBRL, round2 } from './mathUtils';
+import { formatBRL, round2, brlComExtenso } from './mathUtils';
 
 // ============================================================
 // FONTE ÚNICA DE DADOS DA PETIÇÃO
@@ -17,8 +17,13 @@ const CALC_CAMPO = {
   'FGTS do período (8%)': 'VALOR_FGTS',
   'Multa de 40% do FGTS': 'VALOR_MULTA_40',
   'Dano moral (10x remuneração)': 'VALOR_DANO_MORAL_10X',
-  'Folgas trabalhadas (informado)': 'VALOR_FT',
+  'Folgas trabalhadas (100%)': 'VALOR_FT',
   'Reflexo DSR sobre FT (1/6)': 'VALOR_DSR',
+  'Acúmulo de função (20%)': 'VALOR_ACUMULO',
+  'Bonificação de assiduidade (diferença)': 'VALOR_ASSIDUIDADE',
+  'Integração de valores por fora': 'VALOR_INTEGRACAO',
+  'Auxílio-alimentação nas folgas': 'VALOR_AUX_ALIM_TOTAL',
+  'Vale-transporte nas folgas': 'VALOR_VT_TOTAL',
 };
 
 const TETO_VALOR_CAUSA = 400000;
@@ -115,7 +120,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
     if (campo) dados[campo] = formatBRL(c.valor);
     somaCausa += Number(c.valor) || 0;
   }
-  dados.VALOR_CAUSA_TOTAL = formatBRL(round2(Math.min(somaCausa, TETO_VALOR_CAUSA)));
+  dados.VALOR_CAUSA_TOTAL = brlComExtenso(round2(Math.min(somaCausa, TETO_VALOR_CAUSA)));
 
   // 2) CNPJ oficial (BrasilAPI)
   const receita = (cnpj) => (dadosReceita || []).find((d) => d && !d.erro && soDigitos(d.cnpj) === soDigitos(cnpj));
@@ -154,7 +159,8 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   const tipo = caso.tipo_dispensa || attrs.tipo_dispensa || 'sem_justa_causa';
   dados.DATA_ADMISSAO = dataExtenso(caso.data_admissao) || '[DATA DE ADMISSÃO]';
   dados.DATA_RESCISAO = dataExtenso(caso.data_rescisao) || '[DATA DE RESCISÃO]';
-  dados.SALARIO = caso.salario != null ? formatBRL(caso.salario) : '[SALÁRIO]';
+  dados.SALARIO = caso.salario != null ? brlComExtenso(caso.salario) : '[SALÁRIO]';
+  dados.RECL_GENERO = (caso.recl_genero || 'M').toUpperCase() === 'F' ? 'F' : 'M';
   dados.MODO_RESCISAO = MODO_RESCISAO[tipo] || 'sem justa causa';
   dados.MOTIVO_SAIDA_RESUMIDO = MOTIVO_SAIDA[tipo] || 'foi dispensado sem justa causa';
 
