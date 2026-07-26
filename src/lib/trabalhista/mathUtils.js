@@ -179,6 +179,16 @@ export function calcularVerbasCaso(caso = {}) {
     itens.push({ item: 'Acúmulo de função (20%)', memoria: `20% × ${formatBRL(salario)} × ${meses} meses`, valor: round2(0.2 * salario * meses) });
   }
 
+  // Gratificação de função — 10% do salário por mês (cláusula 3ª CCT vigilância)
+  if (caso.tem_gratificacao && salario && meses) {
+    itens.push({ item: 'Gratificação de função (10%)', memoria: `10% × ${formatBRL(salario)} × ${meses} meses (cláusula 3ª)`, valor: round2(0.1 * salario * meses) });
+  }
+
+  // Desvio de função — multa convencional de 50% do salário por mês (cláusula 64ª)
+  if (caso.tem_desvio && salario && meses) {
+    itens.push({ item: 'Desvio de função (50%)', memoria: `50% × ${formatBRL(salario)} × ${meses} meses (cláusula 64ª)`, valor: round2(0.5 * salario * meses) });
+  }
+
   // Bonificação de assiduidade — diferença mensal × meses
   if (caso.tem_assiduidade && caso.assiduidade_diferenca && meses) {
     const dif = Number(caso.assiduidade_diferenca);
