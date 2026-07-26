@@ -95,7 +95,7 @@ export default function GerarPorEntrevista() {
     setGenerating(true);
     try {
       const geracaoTexto = opts.texto ?? userText;
-      const { dados, dadosReceita, dadosCep, dadosDatajud, calculos, caso, modeloSemelhante } = await gerarDadosPeca({
+      const { dados, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarDadosPeca({
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
@@ -125,6 +125,7 @@ export default function GerarPorEntrevista() {
         dadosDatajud?.length && { role: 'tool_result', title: 'Retorno do DataJud/CNJ', text: JSON.stringify(dadosDatajud, null, 2) },
         caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
         calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
+        dadosCct?.clausulas?.length && { role: 'tool_result', title: `Cláusulas da CCT aplicável${dadosCct.meta?.titulo ? ` — ${dadosCct.meta.titulo}` : ''}`, text: JSON.stringify(dadosCct.clausulas.map((c) => ({ clausula: `${c.clausula_ref} — ${c.clausula_titulo}`, cct: c.titulo, conteudo: c.conteudo, fonte: c.fonte_url })), null, 2) },
         { role: 'tool_result', title: 'Dados e flags aplicados ao template', text: JSON.stringify(dados, null, 2) },
         modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
         {
@@ -137,6 +138,7 @@ export default function GerarPorEntrevista() {
             dadosReceita,
             dadosCep,
             dadosDatajud,
+            dadosCct,
           }), null, 2),
         },
       ].filter(Boolean);
