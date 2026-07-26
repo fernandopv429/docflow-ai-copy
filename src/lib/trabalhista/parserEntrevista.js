@@ -1,10 +1,9 @@
 import { base44 } from '@/api/base44Client';
 import { traceAiCall } from '@/lib/sessionTrace';
 
-// Agente extrator: converte o texto livre da entrevista diretamente nos
-// campos usados pelo template (dadosTemplate.js), usando um modelo rápido/barato.
-// Além dos dados estruturados, extrai os POUCOS trechos livres do caso concreto
-// (fatos do dano moral, fatos do capítulo de rescisão) e as flags das teses.
+// Agente extrator: converte o texto livre da entrevista nos campos usados pelo
+// MODELO-MESTRE (via dadosTemplate.js). Extrai dados estruturados, os poucos
+// trechos livres do caso (fatos do dano moral) e as flags das teses.
 const CASO_SCHEMA = {
   type: 'object',
   properties: {
@@ -20,7 +19,7 @@ const CASO_SCHEMA = {
     recl_ctps: { type: 'string' },
     recl_serie: { type: 'string' },
     recl_nascimento: { type: 'string', description: 'Formato YYYY-MM-DD' },
-    recl_filiacao: { type: 'string', description: 'Nome do pai e/ou da mãe' },
+    recl_filiacao: { type: 'string', description: 'Nome da mãe e do pai' },
     recl_endereco: { type: 'string' },
 
     // Reclamadas
@@ -29,49 +28,59 @@ const CASO_SCHEMA = {
     recl1_logradouro: { type: 'string' },
     recl2_nome: { type: 'string', description: '2ª reclamada / tomadora de serviços, se houver' },
     recl2_cnpj: { type: 'string' },
-    recl3_nome: { type: 'string' },
-    recl3_cnpj: { type: 'string' },
+    local_prestacao: { type: 'string', description: 'Endereço do local onde os serviços foram prestados (define a competência)' },
+    comarca_uf: { type: 'string', description: 'UF com 2 letras (ex.: SP)' },
 
     // Contrato
     data_admissao: { type: 'string', description: 'Formato YYYY-MM-DD' },
     data_rescisao: { type: 'string', description: 'Formato YYYY-MM-DD' },
     funcao: { type: 'string' },
     salario: { type: 'number' },
-    jornada_horario: { type: 'string', description: 'Ex.: 12x36 das 19h às 7h' },
-    jornada_extrapola: { type: 'boolean', description: 'true se houver sobrejornada/horas extras' },
-    intervalo_gozado: { type: 'boolean', description: 'false se o intervalo intrajornada não era usufruído' },
-    sindicato: { type: 'string', description: 'Sindicato profissional da categoria' },
-    cct: { type: 'string', description: 'Convenção coletiva aplicável, se citada' },
     tipo_dispensa: {
       type: 'string',
       enum: ['sem_justa_causa', 'rescisao_indireta', 'nulidade_pedido_demissao', 'reversao_justa_causa', 'acordo'],
     },
-    comarca_uf: { type: 'string', description: 'UF com 2 letras (ex.: SP)' },
-    val_ft: { type: 'number', description: 'Quantidade de folgas trabalhadas' },
-    ft_qtd_media: { type: 'number' },
+
+    // Jornada
+    jornada_horario: { type: 'string', description: 'Horários. Ex.: das 19h às 7h' },
+    escala: { type: 'string', description: 'Escala. Ex.: 12x36, 4x2, 5x2, 6x1' },
+    intervalo_usufruido: { type: 'string', description: 'Intervalo efetivo. Ex.: 10 a 15 minutos' },
+    prorrogacao_jornada: { type: 'string', description: 'Extensão habitual. Ex.: 30 min a 1h' },
+    val_ft: { type: 'number', description: 'Valor total informado das folgas trabalhadas (R$)' },
+    ft_qtd_media: { type: 'number', description: 'Média de folgas/feriados trabalhados por mês' },
+
+    // Teses — dados de apoio
+    acumulo_atividades: { type: 'string', description: 'Tarefas extras acumuladas (ex.: rondas, recepção, limpeza)' },
+    assiduidade_prometido: { type: 'number', description: 'Bônus de assiduidade prometido (R$)' },
+    assiduidade_pago: { type: 'number', description: 'Bônus de assiduidade efetivamente pago (R$)' },
+    assiduidade_diferenca: { type: 'number', description: 'Diferença mensal da assiduidade (R$)' },
+    doenca_descricao: { type: 'string', description: 'Doença/lesão ocupacional (ex.: hérnia de disco)' },
+    valor_por_fora: { type: 'number', description: 'Valor médio pago por fora (R$)' },
+    valor_aux_alimentacao: { type: 'number', description: 'Valor diário do auxílio-alimentação da CCT (R$)' },
+    cct_ano: { type: 'string', description: 'Ano da CCT aplicável. Ex.: 2025' },
+    cct_clausulas: { type: 'string', description: 'Cláusulas específicas citadas' },
+    cct_clausula_multa: { type: 'string', description: 'Cláusula da multa convencional' },
+    periodo_ferias_prop: { type: 'string', description: 'Período das férias proporcionais, se citado' },
+    periodo_13: { type: 'string', description: 'Período do 13º proporcional, se citado' },
+    periodo_ferias_vencidas: { type: 'string', description: 'Período das férias vencidas, se houver' },
 
     // Flags das teses (true APENAS com suporte no relato)
-    tem_desvio: { type: 'boolean' },
     tem_acumulo: { type: 'boolean' },
-    tem_intervalo_suprimido: { type: 'boolean', description: 'Intervalo intrajornada suprimido/reduzido (art. 71 CLT)' },
-    tem_adic_noturno: { type: 'boolean' },
-    tem_dsr: { type: 'boolean', description: 'Diferenças de DSR' },
-    tem_minutos_residuais: { type: 'boolean', description: 'Minutos que antecedem/sucedem a jornada' },
-    tem_dez_min_cct: { type: 'boolean', description: 'Cláusula de 10 minutos de descanso (CCT)' },
-    tem_insalubridade: { type: 'boolean' },
+    tem_adic_noturno: { type: 'boolean', description: 'Houve labor em horário noturno' },
+    tem_integracao_por_fora: { type: 'boolean', description: 'Pagamento "por fora" (dinheiro/PIX)' },
     tem_periculosidade: { type: 'boolean' },
-    tem_integracao_por_fora: { type: 'boolean', description: 'Pagamento "por fora" a integrar à remuneração' },
-    tem_vale_transporte: { type: 'boolean', description: 'Ausência de vale-transporte nas folgas' },
+    tem_assiduidade: { type: 'boolean', description: 'Bônus de assiduidade pago a menor' },
+    tem_vale_transporte: { type: 'boolean', description: 'Ausência de VT nas folgas' },
     tem_auxilio_alimentacao: { type: 'boolean', description: 'Ausência de auxílio-alimentação nas folgas' },
-    tem_estabilidade: { type: 'boolean', description: 'Estabilidade por doença/acidente' },
-    tem_pensao: { type: 'boolean', description: 'Pensão vitalícia' },
-    tem_assiduidade: { type: 'boolean' },
+    tem_doenca: { type: 'boolean', description: 'Doença ocupacional decorrente do trabalho' },
+    tem_estabilidade: { type: 'boolean', description: 'Estabilidade provisória (acompanha doença)' },
+    tem_pensao: { type: 'boolean', description: 'Perda/redução da capacidade laborativa' },
+    tem_ft: { type: 'boolean', description: 'Folgas/feriados trabalhados' },
+    tem_ferias_vencidas: { type: 'boolean' },
     tem_dano_moral: { type: 'boolean' },
 
     // Textos livres do caso concreto
-    dano_fatos: { type: 'string', description: 'Fatos que configuram o dano moral, redigidos em 2-4 frases' },
-    dano_supervisor: { type: 'string', description: 'Nome/conduta do supervisor, se relatado' },
-    coacao_fatos: { type: 'string', description: 'Fatos da coação/rescisão indireta/reversão, redigidos em 2-4 frases' },
+    dano_fatos: { type: 'string', description: 'Fato concreto do dano moral, redigido em 2-4 frases (nome do supervisor, tipo de perseguição/humilhação)' },
   },
 };
 
@@ -88,10 +97,10 @@ Regras:
 - Extraia SOMENTE o que estiver explícito ou claramente inferível no texto. NÃO invente dados.
 - Omita campos sem informação (não retorne string vazia nem null).
 - Datas em YYYY-MM-DD (interprete formatos brasileiros como 22/01/26 → 2026-01-22).
-- CPF/CNPJ somente números. Salário como número (ex.: 2500.00).
+- CPF/CNPJ somente números. Valores monetários como número (ex.: 2500.00).
 - tipo_dispensa: "demissão forçada", coação ou perseguição para pedir demissão → nulidade_pedido_demissao; falta grave do empregador → rescisao_indireta; justa causa contestada → reversao_justa_causa.
-- Booleans (tem_*, jornada_extrapola, intervalo_gozado): defina apenas com suporte no relato.
-- dano_fatos e coacao_fatos: redija de forma objetiva (2-4 frases) SOMENTE se houver fatos no relato; caso contrário, omita.
+- Booleans (tem_*): defina true apenas com suporte no relato.
+- dano_fatos: redija de forma objetiva (2-4 frases) SOMENTE se houver fatos no relato; caso contrário, omita.
 
 Responda APENAS com o objeto JSON.`,
     model: 'gemini_3_flash',
