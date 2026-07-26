@@ -11,6 +11,7 @@ import {
   enriquecerCeps,
   enriquecerDatajud,
   montarTermosDatajud,
+  enriquecerCct,
 } from './consultas';
 
 // ============================================================
@@ -51,6 +52,18 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
       : Promise.resolve({}),
   ]);
 
+  // Convenção coletiva (CCT) vigente na data do fato — cláusulas + metadados.
+  let dadosCct = null;
+  if (config.cct_ativo) {
+    notify('Consultando a CCT vigente (categoria/vigência)...');
+    dadosCct = await enriquecerCct(caso, attrs, config).catch(() => null);
+    if (dadosCct?.meta) {
+      if (!caso.cct_ano && dadosCct.meta.ano_base) caso.cct_ano = String(dadosCct.meta.ano_base);
+      if (!caso.sindicato && dadosCct.meta.sindicato_laboral) caso.sindicato = dadosCct.meta.sindicato_laboral;
+      if (dadosCct.meta.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
+    }
+  }
+
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
@@ -75,6 +88,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
     dadosReceita,
     dadosCep,
     dadosDatajud,
+    dadosCct,
     calculos,
     caso,
     modeloSemelhante: modeloSemelhante ? { titulo: modeloSemelhante.titulo } : null,
