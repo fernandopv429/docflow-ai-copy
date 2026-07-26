@@ -103,6 +103,9 @@ Regras:
 - CPF/CNPJ somente números. Valores monetários como número (ex.: 2500.00).
 - tipo_dispensa: "demissão forçada", coação ou perseguição para pedir demissão → nulidade_pedido_demissao; falta grave do empregador → rescisao_indireta; justa causa contestada → reversao_justa_causa.
 - Booleans (tem_*): defina true apenas com suporte no relato.
+- recl_genero: 'M' ou 'F', inferido do nome/relato (para concordância de gênero na peça).
+- maior_remuneracao: preencha só se citada uma remuneração maior que o salário (base do dano moral); senão omita.
+- val_ft = valor de CADA folga trabalhada; val_conducao = valor de UMA condução; valor_aux_alimentacao = valor diário; ft_qtd_media = folgas por mês.
 - dano_fatos: redija de forma objetiva (2-4 frases) SOMENTE se houver fatos no relato; caso contrário, omita.
 
 Responda APENAS com o objeto JSON.`,
