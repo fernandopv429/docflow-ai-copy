@@ -184,3 +184,67 @@ export async function enriquecerDatajud(attrs, config) {
     )
   ), { ttlMs: 30 * 60 * 1000 });
 }
+
+// ---- CCT (cct-api / pgvector) — cláusulas por categoria + vigência ----
+// Categoria da convenção a partir da função/sindicato do caso.
+export function categoriaCct(caso = {}, attrs = {}) {
+  const t = `${caso.funcao || attrs.funcao || ''} ${caso.sindicato || ''}`.toLowerCase();
+  if (/vigilante|seevissp|sesvesp|segurança/.test(t)) return 'vigilancia';
+  if (/asseio|limpeza|conserva|siemaco|seac/.test(t)) return 'asseio_conservacao';
+  return 'terceirizados'; // porteiro / controlador de acesso / SINDEEPRES (padrão)
+}
+
+export async function consultarCct({ pergunta, categoria, data_fato, limite = 4 }) {
+  try {
+    const resp = await base44.functions.invoke('cct', { pergunta, categoria, data_fato, limite });
+    const data = resp?.data ?? resp;
+    return { pergunta, resultados: Array.isArray(data?.resultados) ? data.resultados : [], erro: data?.erro };
+  } catch (e) {
+    return { pergunta, resultados: [], erro: 'indisponível' };
+  }
+}
+
+// Perguntas padrão para reunir as cláusulas mais usadas na peça.
+const CCT_PERGUNTAS = [
+  'adicional noturno e hora noturna reduzida',
+  'auxílio alimentação / refeição e vale-transporte',
+  'multa convencional por descumprimento de cláusula',
+  'adicional de horas extras e intervalo intrajornada',
+];
+
+export async function enriquecerCct(caso, attrs, config) {
+  if (!config?.cct_ativo) return null;
+  const categoria = config.cct_categoria || categoriaCct(caso, attrs);
+  const data_fato = caso?.data_rescisao || caso?.data_admissao || undefined;
+  const key = runtimeCacheKey({ categoria, data_fato });
+  return withRuntimeCache('cct', key, async () => {
+    const buscas = await Promise.all(
+      CCT_PERGUNTAS.map((pergunta) => consultarCct({ pergunta, categoria, data_fato, limite: 3 }))
+    );
+    // dedup por cláusula (clausula_ref + título da CCT)
+    const vistos = new Set();
+    const clausulas = [];
+    for (const b of buscas) {
+      for (const r of b.resultados) {
+        const id = `${r.titulo}||${r.clausula_ref}`;
+        if (vistos.has(id)) continue;
+        vistos.add(id);
+        clausulas.push(r);
+      }
+    }
+    const top = clausulas[0] || null;
+    return {
+      categoria,
+      data_fato,
+      clausulas,
+      meta: top ? {
+        titulo: top.titulo,
+        ano_base: top.ano_base,
+        vigencia_inicio: top.vigencia_inicio,
+        vigencia_fim: top.vigencia_fim,
+        sindicato_laboral: top.sindicato_laboral,
+        fonte_url: top.fonte_url,
+      } : null,
+    };
+  }, { ttlMs: 30 * 60 * 1000 });
+}
