@@ -54,6 +54,8 @@ const CASO_SCHEMA = {
 
     // Teses — dados de apoio
     acumulo_atividades: { type: 'string', description: 'Tarefas extras acumuladas (ex.: rondas, recepção, limpeza)' },
+    desvio_atividades: { type: 'string', description: 'Atividades de função superior/diversa exercidas (desvio de função)' },
+    salarios_aberto: { type: 'string', description: 'Meses de salário não pagos (ex.: julho e dezembro de 2024)' },
     assiduidade_prometido: { type: 'number', description: 'Bônus de assiduidade prometido (R$)' },
     assiduidade_pago: { type: 'number', description: 'Bônus de assiduidade efetivamente pago (R$)' },
     assiduidade_diferenca: { type: 'number', description: 'Diferença mensal da assiduidade (R$)' },
@@ -69,6 +71,10 @@ const CASO_SCHEMA = {
 
     // Flags das teses (true APENAS com suporte no relato)
     tem_acumulo: { type: 'boolean' },
+    tem_desvio: { type: 'boolean', description: 'Exercia função superior/diversa (desvio de função)' },
+    tem_gratificacao: { type: 'boolean', description: 'Vigilante condutor sem gratificação de 10% (cláusula 3ª)' },
+    tem_dez_min_cct: { type: 'boolean', description: 'Vigilância: não concessão dos 10 min de descanso (cláusula 33ª)' },
+    tem_salarios_aberto: { type: 'boolean', description: 'Há salários em aberto/não pagos' },
     tem_adic_noturno: { type: 'boolean', description: 'Houve labor em horário noturno' },
     tem_integracao_por_fora: { type: 'boolean', description: 'Pagamento "por fora" (dinheiro/PIX)' },
     tem_periculosidade: { type: 'boolean' },
