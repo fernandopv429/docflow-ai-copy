@@ -46,15 +46,15 @@ export default function ModelosReferencia() {
   }, []);
 
   const salvarConfig = async (patch) => {
-    if (!config?.id) return;
-    const novo = { ...config, ...patch };
-    setConfig(novo);
-    try {
-      await base44.entities.IntegracaoConfig.update(config.id, patch);
-      invalidateRuntimeCache('config-integracoes'); // muda a geração na hora (sem esperar o TTL)
-    } catch (e) {
-      setErro('Erro ao salvar a configuração das integrações.');
+    // Upsert do singleton: garante o registro antes de gravar (nunca descarta em silêncio).
+    let atual = config;
+    if (!atual?.id) {
+      const lista = await base44.entities.IntegracaoConfig.list('-updated_date', 1);
+      atual = lista?.[0] || (await base44.entities.IntegracaoConfig.create({ chave: 'default' }));
     }
+    setConfig({ ...atual, ...patch });
+    await base44.entities.IntegracaoConfig.update(atual.id, patch);
+    invalidateRuntimeCache('config-integracoes'); // muda a geração na hora (sem esperar o TTL)
   };
 
   const handleTemplateUpload = async (e) => {
@@ -63,11 +63,12 @@ export default function ModelosReferencia() {
     setImportando(true); setErro(null); setMsg(null);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      if (!file_url) throw new Error('upload não retornou URL do arquivo');
       await salvarConfig({ template_docx_url: file_url, template_docx_nome: file.name });
       setMsg(`Template oficial atualizado: ${file.name}`);
     } catch (err) {
       console.error(err);
-      setErro('Erro ao enviar o template .docx.');
+      setErro(`Erro ao enviar/salvar o template .docx: ${err?.message || err}`);
     }
     setImportando(false);
     e.target.value = '';
