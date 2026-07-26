@@ -24,12 +24,13 @@ export function fontesAuditoria({ texto, template, referencia }) {
   return fontes;
 }
 
-export function fontesGeracao({ texto, documentos, template, referencia, dadosReceita, dadosCep, dadosDatajud }) {
+export function fontesGeracao({ texto, documentos, template, referencia, dadosReceita, dadosCep, dadosDatajud, dadosCct }) {
   const fontes = [...fonteTexto(texto), ...fontesDocumentos(documentos)];
   if (template) fontes.push({ tipo: 'template principal', nome: template.title, url: template.content_url || undefined });
   if (referencia) fontes.push({ tipo: 'modelo de referência', nome: referencia.titulo, url: referencia.arquivo_url || undefined });
   if (dadosReceita?.length) fontes.push({ tipo: 'fonte externa', nome: 'BrasilAPI — consulta de CNPJ', url: 'https://brasilapi.com.br/docs#tag/CNPJ' });
   if (dadosCep?.length) fontes.push({ tipo: 'fonte externa', nome: 'ViaCEP — consulta de endereço', url: 'https://viacep.com.br/' });
   if (dadosDatajud?.length) fontes.push({ tipo: 'fonte externa', nome: 'DataJud — Conselho Nacional de Justiça', url: 'https://datajud-wiki.cnj.jus.br/' });
+  if (dadosCct?.meta) fontes.push({ tipo: 'CCT', nome: dadosCct.meta.titulo, url: dadosCct.meta.fonte_url || undefined });
   return fontes;
 }
