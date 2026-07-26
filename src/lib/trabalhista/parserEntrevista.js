@@ -11,6 +11,7 @@ const CASO_SCHEMA = {
 
     // Reclamante
     recl_nome: { type: 'string' },
+    recl_genero: { type: 'string', enum: ['M', 'F'], description: 'Gênero do reclamante (M/F) para concordância' },
     recl_nacionalidade: { type: 'string' },
     recl_estado_civil: { type: 'string' },
     recl_cpf: { type: 'string', description: 'Somente números' },
@@ -36,6 +37,7 @@ const CASO_SCHEMA = {
     data_rescisao: { type: 'string', description: 'Formato YYYY-MM-DD' },
     funcao: { type: 'string' },
     salario: { type: 'number' },
+    maior_remuneracao: { type: 'number', description: 'Maior remuneração na função (base do dano moral); se ausente, usa o salário' },
     tipo_dispensa: {
       type: 'string',
       enum: ['sem_justa_causa', 'rescisao_indireta', 'nulidade_pedido_demissao', 'reversao_justa_causa', 'acordo'],
@@ -46,7 +48,8 @@ const CASO_SCHEMA = {
     escala: { type: 'string', description: 'Escala. Ex.: 12x36, 4x2, 5x2, 6x1' },
     intervalo_usufruido: { type: 'string', description: 'Intervalo efetivo. Ex.: 10 a 15 minutos' },
     prorrogacao_jornada: { type: 'string', description: 'Extensão habitual. Ex.: 30 min a 1h' },
-    val_ft: { type: 'number', description: 'Valor total informado das folgas trabalhadas (R$)' },
+    val_ft: { type: 'number', description: 'Valor pago por CADA folga trabalhada (R$)' },
+    val_conducao: { type: 'number', description: 'Valor de UMA condução (R$), p/ vale-transporte nas folgas' },
     ft_qtd_media: { type: 'number', description: 'Média de folgas/feriados trabalhados por mês' },
 
     // Teses — dados de apoio
