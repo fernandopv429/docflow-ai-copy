@@ -22,6 +22,7 @@ import {
   preencherEsqueleto,
   textoDaPeca,
 } from '@/lib/trabalhista/previewTemplate';
+import ConfirmacaoGeracao from '@/components/ConfirmacaoGeracao';
 
 export default function GerarPorEntrevista() {
   const [messages, setMessages] = useState([]);
@@ -255,8 +256,17 @@ export default function GerarPorEntrevista() {
         .map((m) => m.text)
         .filter(Boolean)
         .join('\n\n');
-      if (res?.pronto_para_gerar || docHtml || ultimaGeracao) {
+      if (res?.pronto_para_gerar) {
         await gerarMinuta({ texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais });
+      } else {
+        setMessages((m) => [
+          ...m.filter((msg) => msg.role !== 'confirm_geracao' || msg.status !== null),
+          {
+            role: 'confirm_geracao',
+            pending: { texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais },
+            status: null,
+          },
+        ]);
       }
     } catch (err) {
       console.error(err);
@@ -270,6 +280,15 @@ export default function GerarPorEntrevista() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const confirmarGeracao = async (pending, msgIndex) => {
+    setMessages((m) => m.map((msg, i) => (i === msgIndex ? { ...msg, status: 'aprovado' } : msg)));
+    await gerarMinuta(pending);
+  };
+
+  const rejeitarGeracao = (msgIndex) => {
+    setMessages((m) => m.map((msg, i) => (i === msgIndex ? { ...msg, status: 'rejeitado' } : msg)));
   };
 
   const exportar = async () => {
@@ -352,6 +371,14 @@ export default function GerarPorEntrevista() {
               {messages.map((m, i) =>
                 m.role === 'tool' || m.role === 'tool_result' ? (
                   <ToolTraceMessage key={i} message={m} />
+                ) : m.role === 'confirm_geracao' ? (
+                  <ConfirmacaoGeracao
+                    key={i}
+                    status={m.status}
+                    disabled={generating || sending}
+                    onConfirmar={() => confirmarGeracao(m.pending, i)}
+                    onRejeitar={() => rejeitarGeracao(i)}
+                  />
                 ) : (
                   <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div
