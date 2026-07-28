@@ -193,20 +193,33 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
     teses: [...new Set([...(inferido.atributos.teses || []), ...(ia.teses || [])])],
   };
   const correcoesAutomaticas = [];
-  if (inferido.cepsIncompletosComCnpj.length) {
-    const dadosOficiais = await enriquecerCnpjs(
-      inferido.cepsIncompletosComCnpj.map((item) => item.cnpj)
-    );
+  const cnpjsParaConsultar = [
+    ...new Set([
+      ...(atributos.cnpjs || []),
+      ...inferido.cepsIncompletosComCnpj.map((item) => item.cnpj),
+    ].map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14)),
+  ];
+  if (cnpjsParaConsultar.length) {
+    const dadosOficiais = await enriquecerCnpjs(cnpjsParaConsultar);
+    const confirmados = [];
+    for (const dado of dadosOficiais) {
+      if (dado.erro) continue;
+      const cepOficial = (dado.cep || '').replace(/\D/g, '');
+      if (cepOficial.length === 8) {
+        atributos.ceps = [...new Set([...(atributos.ceps || []), cepOficial])];
+      }
+      confirmados.push(`${dado.razao_social} (${dado.cnpj})${cepOficial.length === 8 ? ` — CEP ${dado.cep}` : ''}`);
+    }
+    if (confirmados.length) {
+      correcoesAutomaticas.push(`CNPJ(s) confirmado(s) na Receita Federal: ${confirmados.join('; ')}`);
+    }
     for (const item of inferido.cepsIncompletosComCnpj) {
       const cnpjDigits = item.cnpj.replace(/\D/g, '');
       const oficial = dadosOficiais.find((dado) => (dado.cnpj || '').replace(/\D/g, '') === cnpjDigits);
-      const cepOficial = (oficial?.cep || '').replace(/\D/g, '');
-      if (!oficial?.erro && cepOficial.length === 8) {
+      if (oficial && !oficial.erro) {
         inferido.pendencias = inferido.pendencias.filter(
           (pendencia) => !pendencia.startsWith(`CEP "${item.cepInformado}"`)
         );
-        atributos.ceps = [...new Set([...(atributos.ceps || []), cepOficial])];
-        correcoesAutomaticas.push(`CEP ${oficial.cep} confirmado pelo CNPJ ${oficial.cnpj}`);
       }
     }
   }
