@@ -1,6 +1,7 @@
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import mammoth from 'mammoth';
 import { extrairCasoDeTexto } from './parserEntrevista';
+import { extrairDeterministico } from './extracaoDeterministica';
 import { calcularVerbasCaso } from './mathUtils';
 import { montarDadosTemplate } from './dadosTemplate';
 import { listarModelosAtivos, rankearModelos } from './matching';
@@ -79,6 +80,26 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
   ]);
   const caso = extracao?.caso || {};
   const alertasExtracao = extracao?.alertas || [];
+
+  // FALLBACK determinístico (regex): quando a IA devolve o caso vazio ou com
+  // lacunas, extrai os campos básicos diretamente do texto da entrevista.
+  // A IA continua prioritária — o regex só preenche o que estiver faltando.
+  const casoDet = temMaterial ? extrairDeterministico(textoParaExtracao) : {};
+  const camposDet = Object.keys(casoDet);
+  let preenchidosDet = 0;
+  for (const k of camposDet) {
+    const v = casoDet[k];
+    if (v === null || v === undefined || v === '' ) continue;
+    const atual = caso[k];
+    const vazioAtual = atual === undefined || atual === null || atual === '' || (Array.isArray(atual) && !atual.length);
+    if (vazioAtual) {
+      caso[k] = v;
+      preenchidosDet += 1;
+    }
+  }
+  if (preenchidosDet > 0 && Object.keys(caso).length <= 2) {
+    notify(`IA não extraiu dados estruturados — preenchido por extração determinística (${preenchidosDet} campos).`);
+  }
 
   // Merge dos atributos já extraídos no chat (conversarEntrevista) como fallback.
   // Garante que função, CNPJ, CEP, comarca e local de prestação cheguem ao template
