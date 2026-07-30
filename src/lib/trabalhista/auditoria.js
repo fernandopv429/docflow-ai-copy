@@ -42,6 +42,9 @@ B1. INCOERÊNCIA DE HORÁRIOS: proibido citar um horário no capítulo de jornad
 B2. SUBDIMENSIONAMENTO DE FOLGAS: proibido confundir a diária por folga com o total mensal. O valor unitário deve ser multiplicado pela média de folgas/mês (e pelos meses). Aponte se a memória de cálculo de folgas usar só o valor unitário.
 B3. OMISSÃO DE FATOS RELATADOS: cada fato listado em "fatos_narrados" deve ter capítulo correspondente na minuta. Aponte TODOS os fatos narrados sem capítulo (ex.: desconto indevido de consignado mencionado mas sem capítulo). Use a lista fatos_narrados do caso.
 B4. CAPÍTULO SEM SUPORTE: proibido incluir capítulo genérico quando o fato correspondente NÃO foi narrado/marcado na entrevista (ex.: insalubridade/penção se marcado "Não"; periculosidade sem exposição; HE sem sobrejornada; noturno sem jornada noturna).
+B5. GRAFIA DE MUNICÍPIO: conferir nomes de cidades — "Itapecerica da Serra/SP" (nunca "Itapecerica da Terra"). Aponte qualquer grafia evidentemente errada de município.
+B6. FERIADOS ANTERIORES À ADMISSÃO: a seção de horas extras 100% (feriados) só pode listar feriados DENTRO do período contratual. Se a admissão for posterior a 01/01, Carnaval ou Páscoa do mesmo ano, esses feriados NÃO podem constar. Aponte feriados listados antes da data de admissão.
+B7. VALOR DA CAUSA UNIFORME: o valor da causa no ROL de pedidos deve ser IGUAL ao do encerramento ("Dá-se à presente o valor de..."). Aponte qualquer divergência entre os dois valores.
 
 === C. CHECAGENS FAV (erros recorrentes do escritório) ===
 C1. GÊNERO: concordância uniforme com o sexo do reclamante em TODA a peça (sem "a reclamante/obreira/autora" para homem, nem o inverso).
@@ -58,6 +61,11 @@ C11. TESE ↔ PEDIDO: cada causa de pedir tem pedido correspondente e vice-versa
 C12. VALOR DA CAUSA: soma dos pedidos = valor da causa; ≤ R$ 400.000,00; por extenso sem erro de digitação.
 C13. JURISPRUDÊNCIA pertinente à tese (ex.: acórdão de reversão de justa causa só em reversão).
 C14. MARCADORES [ ] pendentes; identidade do escritório correta (Dr. Fernando Andrade Vieira, OAB/SP 320.825).
+C15. HONORÁRIOS SUCUMBENCIAIS: a fundamentação correta é o ARTIGO 791-A DA CLT (Lei 13.467/2017). A Súmula 425 do TST versa sobre JUS POSTULANDI (justiça gratuita/parte que se defende sem advogado) — NÃO serve de fundamento para honorários. Aponte se a peça citar "Súmula 425" para honorários no corpo ou no fecho.
+C16. FRAÇÕES COM AVISO PRÉVIO: o 13º proporcional e as férias + 1/3 devem usar a data de rescisão PROJETADA pelo aviso prévio indenizado (rescisão + 30 dias, Lei 12.506/2011). Para admissão em meados do ano, o 13º NUNCA pode ser 12/12 (não houve trabalho de janeiro a março); férias NUNCA pode ser 11/12 se o contrato durou menos de 11 meses. Aponte frações incompatíveis com as datas do contrato + projeção do aviso.
+C17. AUXÍLIO-ALIMENTAÇÃO ZERO: se a tese de auxílio-alimentação nas folgas estiver ativa, o valor unitário diário da CCT NÃO pode ser R$ 0,00. Aponte "R$ 0,00" no pedido de auxílio-alimentação — deve constar o valor diário estipulado pela CCT da categoria.
+C18. MULTA CONVENCIONAL SEM CLÁUSULA: no tópico das multas, deve constar o NÚMERO da cláusula da CCT que prevê a penalidade (ex.: "Cláusula 64ª"). Aponte "multa da cláusula da CCT" sem numeração — identificar a cláusula específica violada.
+C19. DUPLICAÇÃO TEXTUAL: aponte palavras/frases duplicadas consecutivamente (ex.: "imputa-lhe imputa-lhe") — artifact de copy-paste ou docxtemplater.
 
 === D. TÉCNICA DOS 4 BLOCOS (qualidade de cada capítulo de mérito) ===
 Cada capítulo de mérito deve conter, na ordem: (1) NARRATIVA dos fatos fiel ao depoimento; (2) ENQUADRAMENTO legal/normativo (CLT + CCT da categoria, com cláusula/ano); (3) JURISPRUDÊNCIA/doutrina (Súmulas TST pertinentes); (4) CONCLUSÃO e PEDIDO direto COM reflexos explícitos. Aponte capítulos que pulam blocos, sobretudo a ausência de reflexos no pedido de fechamento.

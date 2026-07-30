@@ -47,7 +47,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
     temMaterial
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto: texto || '', fileUrls: urls }), () => extrairCasoDeTexto(texto || '', urls), {
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 2, texto: texto || '', fileUrls: urls }), () => extrairCasoDeTexto(texto || '', urls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({ caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Falha na extração estruturada.' }] }))
       : Promise.resolve({ caso: {}, alertas: [] }),
@@ -117,14 +117,24 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
       // Extrai valor de auxílio-alimentação das cláusulas CCT se não informado
       if (!caso.valor_aux_alimentacao) {
         const clausulaAlim = dadosCct.clausulas.find((c) =>
-          /alimenta[çc][ãa]o|refei[çc][ãa]o/i.test(c.ementa || c.texto || '')
+          /alimenta[çc][ãa]o|refei[çc][ãa]o/i.test(c.ementa || c.texto || c.clausula_titulo || '')
         );
         if (clausulaAlim) {
-          const matchValor = (clausulaAlim.ementa || clausulaAlim.texto || '').match(/R\$\s*([\d.,]+)/i);
+          const matchValor = (clausulaAlim.ementa || clausulaAlim.texto || clausulaAlim.conteudo || '').match(/R\$\s*([\d.,]+)/i);
           if (matchValor) {
             const v = parseFloat(matchValor[1].replace(/\./g, '').replace(',', '.'));
             if (v > 0 && v < 100) { caso.valor_aux_alimentacao = v; notify(`Valor de auxílio-alimentação obtido da CCT: R$ ${v}`); }
           }
+        }
+      }
+      // Extrai a cláusula da multa convencional (penalidade por descumprimento) se não informada
+      if (!caso.cct_clausula_multa) {
+        const clausulaMulta = dadosCct.clausulas.find((c) =>
+          /\bmulta\b|penalidade|descumprimento/i.test(c.ementa || c.texto || c.clausula_titulo || c.conteudo || '')
+        );
+        if (clausulaMulta?.clausula_ref) {
+          caso.cct_clausula_multa = clausulaMulta.clausula_ref;
+          notify(`Cláusula da multa convencional obtida da CCT: ${clausulaMulta.clausula_ref}`);
         }
       }
     }

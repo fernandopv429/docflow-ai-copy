@@ -91,15 +91,27 @@ const MOTIVO_SAIDA = {
 
 const flag = (v) => !!v;
 const soDigitos = (s) => (s || '').replace(/\D/g, '');
-const valorOuTexto = (v) => (v == null || v === '' ? '' : typeof v === 'number' ? formatBRL(v) : String(v));
+// 0 numérico vira vazio (evita "R$ 0,00" no template quando o valor não foi extraído)
+const valorOuTexto = (v) => (v == null || v === '' || v === 0 ? '' : typeof v === 'number' ? formatBRL(v) : String(v));
+
+// Correções de grafia de municípios recorrentes (erros de digitação/OCR do template e da IA)
+const CORRECOES_MUNICIPIO = {
+  'ITAPECERICA DA TERRA': 'ITAPECERICA DA SERRA',
+  'ITAPECERICA DA TERRA/SP': 'ITAPECERICA DA SERRA/SP',
+  'SAO PAULO/SP': 'SÃO PAULO/SP',
+};
+function corrigirMunicipio(nome) {
+  if (!nome) return nome;
+  return CORRECOES_MUNICIPIO[String(nome).toUpperCase()] || nome;
+}
 
 function localPrestacao(dadosCep = []) {
   const v = (dadosCep || []).find((d) => d && !d.erro && d.municipio);
-  return v ? { municipio: v.municipio, uf: v.uf } : null;
+  return v ? { municipio: corrigirMunicipio(v.municipio), uf: v.uf } : null;
 }
 
 function montarVaraCidadeRegiao(caso, local) {
-  const municipio = local?.municipio || caso.comarca || '';
+  const municipio = corrigirMunicipio(local?.municipio || caso.comarca || '');
   const uf = (local?.uf || (caso.comarca_uf || '').replace(/[^A-Za-z]/g, '')).toUpperCase().slice(0, 2);
   if (!municipio) return '';
   const regiao = TRT_POR_UF[uf];
@@ -122,7 +134,11 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
     if (campo) dados[campo] = formatBRL(c.valor);
     somaCausa += Number(c.valor) || 0;
   }
-  dados.VALOR_CAUSA_TOTAL = brlComExtenso(round2(Math.min(somaCausa, TETO_VALOR_CAUSA)));
+  const valorCausa = brlComExtenso(round2(Math.min(somaCausa, TETO_VALOR_CAUSA)));
+  dados.VALOR_CAUSA_TOTAL = valorCausa;
+  // Aliases — algumas versões do template usam tags diferentes para o mesmo valor
+  dados.VALOR_CAUSA = valorCausa;
+  dados.VALOR_TOTAL_PEDIDOS = valorCausa;
 
   // 2) CNPJ oficial (BrasilAPI)
   const receita = (cnpj) => (dadosReceita || []).find((d) => d && !d.erro && soDigitos(d.cnpj) === soDigitos(cnpj));

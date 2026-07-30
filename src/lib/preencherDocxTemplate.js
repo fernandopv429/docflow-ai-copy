@@ -42,6 +42,38 @@ function aplicarGenero(zip) {
   zip.file(alvo, xml);
 }
 
+// Escapa texto para uso em regex
+function escaparRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Substitui uma frase no XML permitindo tags XML entre as palavras (preserva o resto)
+function substituirFraseTagTolerant(xml, frase, destino) {
+  const partes = frase.split(/\s+/).map(escaparRegex);
+  const pattern = partes.join('\\s*(?:<[^>]+>)*\\s*');
+  return xml.replace(new RegExp(pattern, 'gi'), destino);
+}
+
+// Correções pós-preenchimento do .docx:
+// 1) Duplicação de palavras consecutivas idênticas (artifact do docxtemplater/paragraphLoop)
+// 2) Erros recorrentes de redação do template (Súmula 425, grafia de município)
+function corrigirTextoFinal(zip) {
+  const alvo = 'word/document.xml';
+  const file = zip.file(alvo);
+  if (!file) return;
+  let xml = file.asText();
+  // 1) Remove duplicação "palavra palavra" dentro de cada nó de texto <w:t>
+  xml = xml.replace(/(<w:t[^>]*>)([^<]*)(<\/w:t>)/g, (m, open, text, close) => {
+    const corrigido = text.replace(/\b([\wÀ-ÿ][\wÀ-ÿ-]*)\s+\1\b/gi, '$1');
+    return open + corrigido + close;
+  });
+  // 2) Correções de redação (tolerante a tags entre palavras)
+  xml = substituirFraseTagTolerant(xml, 'Súmula 425 do Tribunal Superior do Trabalho', 'artigo 791-A da CLT');
+  xml = substituirFraseTagTolerant(xml, 'Súmula 425 TST', 'artigo 791-A da CLT');
+  xml = substituirFraseTagTolerant(xml, 'Itapecerica da Terra', 'Itapecerica da Serra');
+  zip.file(alvo, xml);
+}
+
 // Mapeamento de marcadores [ENTRE COLCHETES] -> campos de dados (mesma tabela do previewTemplate)
 const MARCADORES_COLCHETES = {
   'VARA / CIDADE / REGIÃO': 'VARA_CIDADE_REGIAO',
@@ -113,6 +145,8 @@ export function preencherDocxTemplate(arrayBuffer, dados) {
   });
   doc.render(dados || {});
   const outZip = doc.getZip();
+  // Correções pós-preenchimento (erros recorrentes do template e duplicações do docxtemplater)
+  corrigirTextoFinal(outZip);
   // Concordância de gênero após o preenchimento (só quando reclamante = mulher)
   if ((dados?.RECL_GENERO || '').toUpperCase() === 'F') aplicarGenero(outZip);
   return outZip.generate({

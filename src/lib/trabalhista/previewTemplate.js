@@ -79,6 +79,19 @@ const MARCADORES_COLCHETES = {
 // Um valor é "pendente" quando ausente, vazio ou ainda é um marcador [ENTRE COLCHETES].
 const pendente = (v) => v == null || v === '' || /^\s*\[.*\]\s*$/.test(String(v));
 
+// Correções pós-preenchimento aplicadas ao texto (preview + auditoria):
+// duplicações consecutivas, Súmula 425 → art. 791-A CLT, grafia de município.
+function corrigirTextoNoHtml(html) {
+  return (html || '').replace(/>([^<]+)</g, (m, text) => {
+    let t = text;
+    t = t.replace(/\b([\wÀ-ÿ][\wÀ-ÿ-]*)\s+\1\b/gi, '$1');
+    t = t.replace(/Súmula\s+425\s+do\s+Tribunal\s+Superior\s+do\s+Trabalho/gi, 'artigo 791-A da CLT');
+    t = t.replace(/Súmula\s+425\s+TST/gi, 'artigo 791-A da CLT');
+    t = t.replace(/Itapecerica\s+da\s+Terra/gi, 'Itapecerica da Serra');
+    return `>${t}<`;
+  });
+}
+
 // Substitui marcadores [ENTRE COLCHETES] pelos valores dos dados.
 function resolverColchetes(html, dados, highlight) {
   return html.replace(/\[([^\]]+)\]/g, (match, conteudo) => {
@@ -109,6 +122,8 @@ export function preencherEsqueleto(html, dados = {}, { highlight = true } = {}) 
   });
   // Suporte a [MARCADOR] (template nativo do escritório)
   out = resolverColchetes(out, dados, highlight);
+  // Correções pós-preenchimento (duplicações, Súmula 425, grafia)
+  out = corrigirTextoNoHtml(out);
   return out;
 }
 

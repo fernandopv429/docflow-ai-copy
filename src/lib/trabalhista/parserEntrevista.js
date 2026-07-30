@@ -283,6 +283,18 @@ DADOS BÁSICOS:
 - recl_serie: número de série da CTPS ("serie: 25795" → "25795"). recl_ctps: só o número da CTPS (sem série).
 - recl_genero: 'M' ou 'F' inferido do nome ("brasileiro/solteiro" → 'M').
 
+MUNICÍPIO/GRAFIA:
+- Grafia correta dos municípios: "Itapecerica da Serra/SP" (NUNCA "Itapecerica da Terra"), "São Paulo/SP", "Osasco/SP".
+- comarca_uf: UF com 2 letras. local_prestacao: endereço completo do local onde o reclamante prestava serviços (define a competência territorial — art. 651 CLT).
+- Se houver CEP, complete o município/UF; confira a grafia antes de gravar.
+
+MULTA CONVENCIONAL:
+- cct_clausula_multa: extraia SEMPRE o número da cláusula da CCT que prevê a multa por descumprimento (ex.: "Cláusula 64ª" → "64ª"). NUNCA deixe em branco se houver CCT aplicável.
+- cct_clausulas: liste as cláusulas específicas citadas na entrevista com numeração.
+
+AUXÍLIO-ALIMENTAÇÃO:
+- valor_aux_alimentacao: valor DIÁRIO unitário estipulado pela CCT (ex.: R$ 25,00/dia → 25.0). Extraia mesmo se não mencionado explicitamente quando há CCT conhecida e folgas trabalhadas.
+
 SALÁRIO:
 - Extraia o salário mesmo que venha como "Salário: 2148,22" ou "R$ 2.148,22".
 - Se não informado explicitamente MAS a função é vigilante e há CCT conhecida, NÃO invente — deixe em branco.
@@ -339,7 +351,7 @@ FATOS NARRADOS:
 
 === RETORNO ===
 Responda APENAS com o objeto JSON. NÃO inclua introduções, saudações, comentários ou qualquer texto fora do JSON. Campos sem informação: omita (não retorne null, "" ou placeholders).`,
-    model: 'gemini_3_flash',
+    model: 'claude_sonnet_4_6',
     response_json_schema: CASO_SCHEMA,
   };
   if (urlsSeguras.length) request.file_urls = urlsSeguras;

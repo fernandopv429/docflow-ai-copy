@@ -91,6 +91,42 @@ export function anosCompletos(admissao, rescisao) {
   return m == null ? null : Math.floor(m / 12);
 }
 
+// Projeta a data de rescisão pelo aviso prévio indenizado (Lei 12.506/2011).
+// 13º e férias proporcionais usam essa data projetada para contar os avos.
+export function dataRescisaoProjetada(admissao, rescisao, anos) {
+  if (!rescisao) return null;
+  const diasAviso = anos != null ? Math.min(30 + anos * 3, 90) : 30;
+  const r = new Date(rescisao);
+  if (isNaN(r.getTime())) return null;
+  r.setDate(r.getDate() + diasAviso);
+  return r.toISOString().slice(0, 10);
+}
+
+// Conta avos (1/12) entre admissão e a data final (atual ou projetada).
+// Mês conta se ≥15 dias de presença (trabalhada ou projetada pelo aviso).
+// contarProjecaoUltimoMes=true → o último mês (projetado pelo aviso indenizado)
+// conta mesmo com <15 dias (aplicável ao 13º; férias usa false).
+export function avosEntreDatas(admissao, dataFinal, contarProjecaoUltimoMes) {
+  if (!admissao || !dataFinal) return null;
+  const a = new Date(admissao);
+  const r = new Date(dataFinal);
+  if (isNaN(a.getTime()) || isNaN(r.getTime()) || r < a) return null;
+  let avos = 0;
+  const cursor = new Date(a.getFullYear(), a.getMonth(), 1);
+  const ultimoMes = new Date(r.getFullYear(), r.getMonth(), 1);
+  const mesAdmissao = new Date(a.getFullYear(), a.getMonth(), 1).getTime();
+  while (cursor <= ultimoMes) {
+    const mesEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const efetivoStart = cursor.getTime() === mesAdmissao ? a : new Date(cursor);
+    const ehUltimo = cursor.getTime() === ultimoMes.getTime();
+    const efetivoEnd = ehUltimo ? r : mesEnd;
+    const dias = Math.floor((efetivoEnd - efetivoStart) / 86400000) + 1;
+    if (dias >= 15 || (ehUltimo && contarProjecaoUltimoMes)) avos += 1;
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return Math.min(avos, 12);
+}
+
 // ============================================================
 // Verbas rescisórias (Lei 12.506/2011 etc.)
 // ============================================================
@@ -147,13 +183,17 @@ export function calcularVerbasCaso(caso = {}) {
     itens.push({ item: 'Duração do contrato', memoria: `${meses} mês(es) / ${anos} ano(s) completo(s)`, valor: null });
   }
 
-  // Verbas rescisórias
+  // Verbas rescisórias — 13º e férias usam a data PROJETADA pelo aviso prévio
   const ap = avisoPrevio(salario, anos);
   if (ap) itens.push({ item: 'Aviso prévio indenizado', memoria: `${ap.dias} dias (Lei 12.506/2011)`, valor: ap.valor });
-  const dt = decimoTerceiroProporcional(salario, meses);
-  if (dt) itens.push({ item: '13º proporcional', memoria: `${dt.avos}/12 avos`, valor: dt.valor });
-  const fe = feriasProporcionais(salario, meses);
-  if (fe) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${fe.avos}/12 avos + 1/3`, valor: fe.valor });
+  const rescisaoProjetada = dataRescisaoProjetada(caso.data_admissao, caso.data_rescisao, anos);
+  const dataFim = rescisaoProjetada || caso.data_rescisao;
+  // 13º: conta o último mês projetado pelo aviso indenizado (ex.: 9/12 de 2025 + 1/12 de 2026)
+  const avos13 = salario ? avosEntreDatas(caso.data_admissao, dataFim, true) : null;
+  if (avos13 != null) itens.push({ item: '13º proporcional', memoria: `${avos13}/12 avos (proj. aviso prévio)`, valor: round2((salario / 12) * avos13) });
+  // Férias: período aquisitivo — só conta mês com ≥15 dias (projeção não força o último mês)
+  const avosFerias = salario ? avosEntreDatas(caso.data_admissao, dataFim, false) : null;
+  if (avosFerias != null) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${avosFerias}/12 avos + 1/3 (proj. aviso prévio)`, valor: round2((salario / 12) * avosFerias * (4 / 3)) });
   const fg = fgtsPeriodo(salario, meses);
   if (fg) {
     itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${meses} meses`, valor: fg.deposito });
