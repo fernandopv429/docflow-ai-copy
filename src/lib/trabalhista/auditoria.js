@@ -26,26 +26,41 @@ const COERENCIA_SCHEMA = {
 };
 
 export async function verificarCoerencia({ texto, caso, dados, documentoTexto }) {
-  const prompt = `Você é um auditor jurídico trabalhista. Verifique a MINUTA gerada quanto à COERÊNCIA factual e jurídica com o caso. NÃO reescreva a peça — apenas aponte problemas.
+  const prompt = `Você é um auditor jurídico trabalhista. Verifique a MINUTA gerada quanto à COERÊNCIA factual e jurídica com o caso, à PADRONIZAÇÃO obrigatória do escritório e às PROIBIÇÕES de redação. NÃO reescreva a peça — apenas aponte problemas.
 
-Checagens obrigatórias (padrão FAV — baseadas nos erros recorrentes do escritório):
-1. GÊNERO: concordância uniforme com o sexo do reclamante em TODA a peça (sem "a reclamante/obreira/autora/dispensada" para homem, nem o inverso).
-2. MODALIDADE de rescisão consistente em TODAS as seções (capítulo da causa + aviso prévio + verbas rescisórias + arts. 477/467 + pedidos).
-3. HONORÁRIOS: percentual Único no corpo e no fecho (não pode 15% num lugar e 20% em outro).
-4. 2ª RECLAMADA: se existe → qualificação + tópico Súmula 331 + pedido de subsidiária presentes; se não existe → todos ausentes.
-5. ESCALA: 12x36 → descaracterização 12x36 + 10 min (cláusula 33ª) presentes; escala diferente (5x2/4x2) → NÃO incluir descaracterização 12x36.
-6. NOTURNO: adicional noturno/hora reduzida só se houver jornada noturna (22h–5h).
-7. CATEGORIA: vigilância vs. asseio governando cláusulas e teses (periculosidade/gratificação/10min/cláusula 33ª são de vigilância; porteiro/asseio usa cláusulas próprias).
-8. CLÁUSULAS DA CCT: o número citado deve ser o MESMO no corpo e no pedido, e coerente com a CCT/ano aplicável.
-9. COPY-PASTE: textos de gratificação/desvio/acúmulo não podem citar função diferente da do reclamante (ex.: "vigilante condutor" num porteiro).
-10. AVISO PRÉVIO: dias coerentes com o tempo de serviço (Lei 12.506/11: 30 + 3/ano, máx. 90).
-11. PROPORÇÕES: 13º e férias+1/3 coerentes com as datas (+ projeção do aviso); saldo de salário coerente.
-12. DANO MORAL: ao menos 1 fato concreto do caso + valor = 10x a maior remuneração na função.
-13. TESE ↔ PEDIDO: cada causa de pedir tem pedido correspondente e vice-versa; sem verba em DUPLICIDADE.
-14. TESE SEM SUPORTE no relato (periculosidade sem exposição; HE sem sobrejornada; noturno sem jornada noturna).
-15. VALOR DA CAUSA: soma dos pedidos = valor da causa; ≤ R$ 400.000,00; por extenso sem erro de digitação.
-16. JURISPRUDÊNCIA pertinente à tese (ex.: acórdão de reversão de justa causa só em reversão).
-17. MARCADORES [ ] pendentes; identidade do escritório correta (Dr. Fernando Andrade Vieira, OAB/SP 320.825).
+=== A. PADRÃO OBRIGATÓRIO (100% das peças) ===
+A1. ESTRUTURA FIXA — a petição deve conter, nesta ORDEM: (i) endereçamento e fixação da competência territorial pelo art. 651 da CLT (local da prestação); (ii) qualificação completa do reclamante e de todas as reclamadas (prestadora e tomadora); (iii) capítulo de PRELIMINARES (competência local; não limitação ao valor da causa — art. 840, §1º CLT e IN 41/2018 TST; opção pelo juízo 100% digital; requerimento de prazo para emenda — arts. 317-321 CPC; justiça gratuita — art. 98 CPC c/c art. 790, §§3º e 4º CLT); (iv) DO CONTRATO DE TRABALHO (admissão, demissão, função, local, último salário, motivo da rescisão); (v) MÉRITO em capítulos temáticos; (vi) ROL DE PEDIDOS com memória descritiva e valores estimativos; (vii) ENCERRAMENTO (provas, recolhimentos INSS/IR, ofícios, OAB p/ intimações, valor da causa). Aponte qualquer seção ausente ou fora de ordem.
+A2. TESES PADRÃO AUTOMÁTICAS:
+  - TOMADORA: se há 2ª reclamada → deve haver tese de responsabilidade subsidiária (Súmula 331, IV, TST — culpa in vigilando/in eligendo) + pedido correspondente. Se não há tomadora, a tese deve estar ausente.
+  - DESCARACTERIZAÇÃO 12x36: se escala 12x36 E houver extrapolação habitual, minutos antecedentes/sucedentes ou labor em folgas → deve haver descaracterização com Súmula 85 do TST (HEs além da 8ª diária e 44ª semanal). Sem esse cenário, NÃO incluir a descaracterização.
+  - ACÚMULO/DESVIO DE FUNÇÃO: deve aplicar a multa/sanção prevista na CCT da categoria do reclamante (não valor fixo genérico).
+  - INTERVALO INTRAJORNADA: se houver intervalo suprimido/reduzido → pleitear a hora cheia (ou saldo suprimido) COM adicional convencional (mínimo de 60% se previsto na CCT da categoria).
+  - REFLEXOS COMPLETOS: TODOS os pedidos salariais/extraordinários (HE, folgas, acúmulo, desvio, assiduidade, integração por fora, etc.) devem trazer reflexos em DSR, aviso prévio, 13º salário, férias + 1/3 e FGTS + 40%. Aponte cada verba sem o conjunto completo de reflexos.
+
+=== B. PROIBIÇÕES DE REDAÇÃO (erros a impedir) ===
+B1. INCOERÊNCIA DE HORÁRIOS: proibido citar um horário no capítulo de jornada e outro no capítulo de adicional noturno. A jornada deve partir de uma MATRIZ ÚNICA de horários. Aponte qualquer divergência interna de horários.
+B2. SUBDIMENSIONAMENTO DE FOLGAS: proibido confundir a diária por folga com o total mensal. O valor unitário deve ser multiplicado pela média de folgas/mês (e pelos meses). Aponte se a memória de cálculo de folgas usar só o valor unitário.
+B3. OMISSÃO DE FATOS RELATADOS: cada fato listado em "fatos_narrados" deve ter capítulo correspondente na minuta. Aponte TODOS os fatos narrados sem capítulo (ex.: desconto indevido de consignado mencionado mas sem capítulo). Use a lista fatos_narrados do caso.
+B4. CAPÍTULO SEM SUPORTE: proibido incluir capítulo genérico quando o fato correspondente NÃO foi narrado/marcado na entrevista (ex.: insalubridade/penção se marcado "Não"; periculosidade sem exposição; HE sem sobrejornada; noturno sem jornada noturna).
+
+=== C. CHECAGENS FAV (erros recorrentes do escritório) ===
+C1. GÊNERO: concordância uniforme com o sexo do reclamante em TODA a peça (sem "a reclamante/obreira/autora" para homem, nem o inverso).
+C2. MODALIDADE de rescisão consistente em TODAS as seções (capítulo da causa + aviso prévio + verbas rescisórias + arts. 477/467 + pedidos).
+C3. HONORÁRIOS: percentual ÚNICO no corpo e no fecho.
+C4. 2ª RECLAMADA: existe → qualificação + Súmula 331 + pedido de subsidiária; não existe → tudo ausente.
+C5. CATEGORIA: vigilância vs. asseio governando cláusulas e teses (periculosidade/gratificação/10min/cláusula 33ª são de vigilância; porteiro/asseio usa cláusulas próprias).
+C6. CLÁUSULAS DA CCT: o número citado deve ser o MESMO no corpo e no pedido, coerente com a CCT/ano aplicável.
+C7. COPY-PASTE: textos de gratificação/desvio/acúmulo não podem citar função diferente da do reclamante.
+C8. AVISO PRÉVIO: dias coerentes com o tempo de serviço (Lei 12.506/11: 30 + 3/ano, máx. 90).
+C9. PROPORÇÕES: 13º e férias+1/3 coerentes com as datas (+ projeção do aviso); saldo de salário coerente.
+C10. DANO MORAL: ao menos 1 fato concreto do caso + valor = 10x a maior remuneração na função.
+C11. TESE ↔ PEDIDO: cada causa de pedir tem pedido correspondente e vice-versa; sem verba em duplicidade.
+C12. VALOR DA CAUSA: soma dos pedidos = valor da causa; ≤ R$ 400.000,00; por extenso sem erro de digitação.
+C13. JURISPRUDÊNCIA pertinente à tese (ex.: acórdão de reversão de justa causa só em reversão).
+C14. MARCADORES [ ] pendentes; identidade do escritório correta (Dr. Fernando Andrade Vieira, OAB/SP 320.825).
+
+=== D. TÉCNICA DOS 4 BLOCOS (qualidade de cada capítulo de mérito) ===
+Cada capítulo de mérito deve conter, na ordem: (1) NARRATIVA dos fatos fiel ao depoimento; (2) ENQUADRAMENTO legal/normativo (CLT + CCT da categoria, com cláusula/ano); (3) JURISPRUDÊNCIA/doutrina (Súmulas TST pertinentes); (4) CONCLUSÃO e PEDIDO direto COM reflexos explícitos. Aponte capítulos que pulam blocos, sobretudo a ausência de reflexos no pedido de fechamento.
 
 Classifique cada alerta: BLOQUEANTE (erro grave), ATENCAO (revisar) ou INFO. Defina "status": "bloqueado" se houver BLOQUEANTE; "revisar" se houver ATENCAO; senão "aprovado".
 

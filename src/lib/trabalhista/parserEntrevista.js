@@ -90,6 +90,13 @@ const CASO_SCHEMA = {
 
     // Textos livres do caso concreto
     dano_fatos: { type: 'string', description: 'Fato concreto do dano moral, redigido em 2-4 frases (nome do supervisor, tipo de perseguição/humilhação)' },
+
+    // Fatos narrados (auditoria cruzada com os capítulos da minuta)
+    fatos_narrados: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Lista TODA irregularidade/fato específico mencionado na entrevista, um por item (ex.: "desconto integral indevido de empréstimo consignado na rescisão", "folgas trabalhadas pagas informalmente via PIX", "desvio para Prevenção de Perdas"). Nenhum pode ser omitido — serve para a auditoria cruzar com os capítulos da minuta.',
+    },
   },
 };
 
@@ -113,6 +120,7 @@ Regras:
 - maior_remuneracao: preencha só se citada uma remuneração maior que o salário (base do dano moral); senão omita.
 - val_ft = valor de CADA folga trabalhada; val_conducao = valor de UMA condução; valor_aux_alimentacao = valor diário; ft_qtd_media = folgas por mês.
 - dano_fatos: redija de forma objetiva (2-4 frases) SOMENTE se houver fatos no relato; caso contrário, omita.
+- fatos_narrados: liste TODA irregularidade/fato específico mencionado na entrevista, um por item, por mais simples que pareça (descontos indevidos, folgas pagas por fora, desvio/acúmulo, intervalo reduzido, minutos antecedentes/sucedentes, falta de VT/auxílio nas folgas, doença, etc.). Nenhum fato narrado pode ser omitido — a auditoria usa esta lista para garantir que cada fato vire capítulo na minuta.
 
 Responda APENAS com o objeto JSON.`,
     model: 'gemini_3_flash',
