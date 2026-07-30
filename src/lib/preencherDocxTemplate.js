@@ -71,10 +71,10 @@ const MARCADORES_COLCHETES = {
 // Remove tags XML internas para unir texto fragmentado (ex.: [NOME<b>...</b>] -> [NOME])
 function unirTextosFragmentados(xml) {
   // Une texto dentro de colchetes que pode estar quebrado por tags <w:r>/<w:t>
-  // Estratégia: remove tags XML dentro de padrões [...]
+  // Estratégia: remove tags XML dentro de padrões [...] mantendo os colchetes
   return xml.replace(/\[([^\]]*)\]/g, (match) => {
     const texto = match.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-    return texto; // devolve o colchete limpo para a substituição posterior
+    return `[${texto}]`;
   });
 }
 
