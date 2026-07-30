@@ -1,7 +1,7 @@
 import { base44 } from '@/api/base44Client';
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import { traceAiCall } from '@/lib/sessionTrace';
-import { extrairCnpjs, extrairCeps, enriquecerCnpjs } from './consultas';
+import { extrairCnpjs, extrairCeps, enriquecerCnpjs, enriquecerCeps } from './consultas';
 
 // ============================================================
 // Conversa (chat) da entrevista: coleta dados incrementalmente,
@@ -221,6 +221,27 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
           (pendencia) => !pendencia.startsWith(`CEP "${item.cepInformado}"`)
         );
       }
+    }
+  }
+
+  // Consulta de CEP (ViaCEP/BrasilAPI) — completa logradouro, bairro, município e UF,
+  // fundamentando a competência territorial (art. 651 da CLT) já durante a entrevista.
+  const cepsParaConsultar = [
+    ...new Set((atributos.ceps || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 8)),
+  ];
+  if (cepsParaConsultar.length) {
+    const dadosCep = await enriquecerCeps(cepsParaConsultar);
+    const cepsCompletos = [];
+    for (const dado of dadosCep) {
+      if (dado.erro) continue;
+      const local = [dado.logradouro, dado.bairro].filter(Boolean).join(', ');
+      const cidade = [dado.municipio, dado.uf].filter(Boolean).join('/');
+      atributos.local_prestacao = atributos.local_prestacao || (local ? `${local}, ${cidade}` : cidade);
+      atributos.comarca_uf = atributos.comarca_uf || dado.uf;
+      cepsCompletos.push(`CEP ${dado.cep}${dado.municipio ? ` — ${cidade}` : ''}`);
+    }
+    if (cepsCompletos.length) {
+      correcoesAutomaticas.push(`Endereço/local de prestação completado(s) via CEP: ${cepsCompletos.join('; ')}`);
     }
   }
 
