@@ -52,6 +52,34 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
       : Promise.resolve({}),
   ]);
 
+  // 2ª passada: CNPJs/CEPs que o parser extraiu do PDF (caso.recl*_cnpj /
+  // endereços com CEP) mas não estavam no texto digitado nem nos attrs da IA.
+  // Garante que a Receita/ViaCEP sejam consultados mesmo quando os dados só
+  // existem dentro do documento anexado.
+  let dadosReceitaFinal = dadosReceita;
+  let dadosCepFinal = dadosCep;
+  if (config.cnpj_ativo) {
+    const cnpjsCaso = [caso?.recl1_cnpj, caso?.recl2_cnpj]
+      .filter(Boolean)
+      .map((c) => (c || '').replace(/\D/g, ''))
+      .filter((d) => d.length === 14 && !cnpjsUnicos.includes(d));
+    const unicosCaso = [...new Set(cnpjsCaso)];
+    if (unicosCaso.length) {
+      notify(`Consultando ${unicosCaso.length} CNPJ(s) extraído(s) do documento na Receita...`);
+      dadosReceitaFinal = [...dadosReceita, ...(await enriquecerCnpjs(unicosCaso))];
+    }
+  }
+  if (config.cep_ativo) {
+    const cepsCaso = extrairCeps(
+      [caso?.recl_endereco, caso?.local_prestacao, caso?.recl1_logradouro].filter(Boolean).join(' ')
+    ).filter((d) => d.length === 8 && !cepsUnicos.includes(d));
+    const unicosCasoCep = [...new Set(cepsCaso)];
+    if (unicosCasoCep.length) {
+      notify(`Consultando ${unicosCasoCep.length} CEP(s) extraído(s) do documento no ViaCEP...`);
+      dadosCepFinal = [...dadosCep, ...(await enriquecerCeps(unicosCasoCep))];
+    }
+  }
+
   // Convenção coletiva (CCT) vigente na data do fato — cláusulas + metadados.
   let dadosCct = null;
   if (config.cct_ativo) {
@@ -81,12 +109,12 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
   }
 
   // Fonte única de dados para preview e exportação (.docx).
-  const dados = montarDadosTemplate({ caso, calculos, attrs, dadosReceita, dadosCep });
+  const dados = montarDadosTemplate({ caso, calculos, attrs, dadosReceita: dadosReceitaFinal, dadosCep: dadosCepFinal });
 
   return {
     dados,
-    dadosReceita,
-    dadosCep,
+    dadosReceita: dadosReceitaFinal,
+    dadosCep: dadosCepFinal,
     dadosDatajud,
     dadosCct,
     calculos,
