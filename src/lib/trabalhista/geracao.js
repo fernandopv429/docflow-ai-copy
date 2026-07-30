@@ -1,8 +1,28 @@
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
+import mammoth from 'mammoth';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { calcularVerbasCaso } from './mathUtils';
 import { montarDadosTemplate } from './dadosTemplate';
 import { listarModelosAtivos, rankearModelos } from './matching';
+
+// Extrai texto puro de arquivos .docx anexados como entrevista.
+// A IA NÃO lê .docx por visão (só PDF/imagem) — sem isto, os dados de um
+// DOCX anexado nunca chegam ao parser e os colchetes ficam vazios.
+async function extrairTextoDocxs(urls) {
+  const urlsDocx = (urls || []).filter((u) => /\.docx(\?[^/]*)?$/i.test(String(u)));
+  if (!urlsDocx.length) return '';
+  let texto = '';
+  for (const u of urlsDocx) {
+    try {
+      const resp = await fetch(u);
+      if (!resp.ok) continue;
+      const arrayBuffer = await resp.arrayBuffer();
+      const { value } = await mammoth.extractRawText({ arrayBuffer });
+      if (value && value.trim()) texto += `\n\n${value.trim()}`;
+    } catch { /* ignora DOCX ilegível */ }
+  }
+  return texto.trim();
+}
 import {
   carregarConfigIntegracoes,
   extrairCnpjs,
@@ -29,8 +49,14 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
     }
   };
   const config = await carregarConfigIntegracoes();
-  const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(texto), ...((attrs && attrs.cnpjs) || [])] : [];
-  const ceps = config.cep_ativo ? [...extrairCeps(texto), ...((attrs && attrs.ceps) || [])] : [];
+  const urls = [...(fileUrls || [])];
+  // DOCX → texto extraído (IA não lê por visão); PDF/imagem → passam por visão
+  const textoDocx = await extrairTextoDocxs(urls).catch(() => '');
+  const urlsDocx = new Set((fileUrls || []).filter((u) => /\.docx(\?[^/]*)?$/i.test(String(u))));
+  const urlsVisao = urls.filter((u) => !urlsDocx.has(u));
+  const textoParaExtracao = [texto || '', textoDocx].filter(Boolean).join('\n\n');
+  const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(textoParaExtracao), ...((attrs && attrs.cnpjs) || [])] : [];
+  const ceps = config.cep_ativo ? [...extrairCeps(textoParaExtracao), ...((attrs && attrs.ceps) || [])] : [];
   const cnpjsUnicos = [...new Set(cnpjs.map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14))];
   const cepsUnicos = [...new Set(ceps.map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 8))];
   if (cnpjsUnicos.length) notify(`Consultando ${cnpjsUnicos.length} CNPJ(s) na Receita Federal (BrasilAPI)...`);
@@ -39,21 +65,32 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
     const termos = montarTermosDatajud(attrs);
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
-  const urls = [...(fileUrls || [])];
-  const temMaterial = Boolean((texto && texto.trim()) || urls.length);
+  const temMaterial = Boolean((textoParaExtracao && textoParaExtracao.trim()) || urlsVisao.length);
   if (temMaterial) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
   const [dadosReceita, dadosCep, dadosDatajud, extracao] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
     temMaterial
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 2, texto: texto || '', fileUrls: urls }), () => extrairCasoDeTexto(texto || '', urls), {
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 3, texto: textoParaExtracao || '', fileUrls: urlsVisao }), () => extrairCasoDeTexto(textoParaExtracao || '', urlsVisao), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({ caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Falha na extração estruturada.' }] }))
       : Promise.resolve({ caso: {}, alertas: [] }),
   ]);
   const caso = extracao?.caso || {};
   const alertasExtracao = extracao?.alertas || [];
+
+  // Merge dos atributos já extraídos no chat (conversarEntrevista) como fallback.
+  // Garante que função, CNPJ, CEP, comarca e local de prestação cheguem ao template
+  // mesmo quando o parser estruturado não os extraiu (ex.: PDF não lido pela IA).
+  const attrsObj = attrs || {};
+  if (!caso.funcao && attrsObj.funcao) caso.funcao = attrsObj.funcao;
+  if (!caso.tipo_dispensa && attrsObj.tipo_dispensa) caso.tipo_dispensa = attrsObj.tipo_dispensa;
+  if (!caso.comarca_uf && attrsObj.comarca_uf) caso.comarca_uf = attrsObj.comarca_uf;
+  if (!caso.local_prestacao && attrsObj.local_prestacao) caso.local_prestacao = attrsObj.local_prestacao;
+  const attrsCnpjs = (attrsObj.cnpjs || []).map((c) => String(c).replace(/\D/g, '')).filter((d) => d.length === 14);
+  if (!caso.recl1_cnpj && attrsCnpjs[0]) caso.recl1_cnpj = attrsCnpjs[0];
+  if (!caso.recl2_cnpj && attrsCnpjs[1]) caso.recl2_cnpj = attrsCnpjs[1];
   if (alertasExtracao.length) {
     const bloqueantes = alertasExtracao.filter((a) => a.severidade === 'BLOQUEANTE');
     const atencoes = alertasExtracao.filter((a) => a.severidade === 'ATENCAO');

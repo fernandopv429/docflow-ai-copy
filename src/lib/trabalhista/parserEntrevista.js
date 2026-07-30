@@ -369,6 +369,22 @@ Responda APENAS com o objeto JSON. NÃO inclua introduções, saudações, comen
     };
   }
 
+  // --- 3b) Desembrulhar resposta defensivamente ---
+  // Alguns modelos/devoluções chegam como string JSON ou aninhados em uma
+  // chave wrapper (caso/data/result/output). Sem isso, normalizarCaso lê
+  // bruto.recl_nome → undefined e TODOS os campos viram colchetes vazios.
+  if (typeof bruto === 'string') {
+    try { bruto = JSON.parse(bruto); } catch { bruto = {}; }
+  }
+  if (bruto && typeof bruto === 'object' && !Array.isArray(bruto)) {
+    const temCampoDireto = CAMPOS_STRING.some((c) => bruto[c] != null && bruto[c] !== '');
+    if (!temCampoDireto) {
+      const wrapper = bruto.caso || bruto.data || bruto.result || bruto.output || bruto.dados || bruto.extraido;
+      if (wrapper && typeof wrapper === 'object') bruto = wrapper;
+    }
+  }
+  if (!bruto || typeof bruto !== 'object') bruto = {};
+
   // --- 4) Normalização + validação de regras + alertas ---
   const { caso, alertas } = normalizarCaso(bruto);
   return { caso, alertas };

@@ -155,7 +155,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.RECL_NOME = (caso.recl_nome || '[NOME DO RECLAMANTE]').toUpperCase();
   dados.RECL_NACIONALIDADE = caso.recl_nacionalidade || 'brasileiro(a)';
   dados.RECL_ESTADO_CIVIL = caso.recl_estado_civil || '[ESTADO CIVIL]';
-  dados.RECL_FUNCAO = caso.funcao || '[FUNÇÃO]';
+  dados.RECL_FUNCAO = caso.funcao || attrs.funcao || '[FUNÇÃO]';
   dados.RECL_RG = caso.recl_rg || '[RG]';
   dados.RECL_CPF = caso.recl_cpf || '[CPF]';
   dados.RECL_PIS = caso.recl_pis || '[PIS]';
