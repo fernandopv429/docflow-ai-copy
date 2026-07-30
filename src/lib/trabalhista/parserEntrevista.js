@@ -118,7 +118,9 @@ Regras:
 - Booleans (tem_*): defina true apenas com suporte no relato.
 - recl_genero: 'M' ou 'F', inferido do nome/relato (para concordância de gênero na peça).
 - maior_remuneracao: preencha só se citada uma remuneração maior que o salário (base do dano moral); senão omita.
-- val_ft = valor de CADA folga trabalhada; val_conducao = valor de UMA condução; valor_aux_alimentacao = valor diário; ft_qtd_media = folgas por mês.
+- val_ft = valor de CADA folga trabalhada (se informado em faixa, ex.: "180 a 200", use a média: 190); val_conducao = valor de UMA condução; valor_aux_alimentacao = valor diário; ft_qtd_media = folgas por mês (se faixa, use a média).
+- recl_serie: extraia o número de série da CTPS (campo "serie" ou "Série nº" na entrevista).
+- recl_ctps: somente o número da CTPS (sem a série).
 - dano_fatos: redija de forma objetiva (2-4 frases) SOMENTE se houver fatos no relato; caso contrário, omita.
 - fatos_narrados: liste TODA irregularidade/fato específico mencionado na entrevista, um por item, por mais simples que pareça (descontos indevidos, folgas pagas por fora, desvio/acúmulo, intervalo reduzido, minutos antecedentes/sucedentes, falta de VT/auxílio nas folgas, doença, etc.). Nenhum fato narrado pode ser omitido — a auditoria usa esta lista para garantir que cada fato vire capítulo na minuta.
 

@@ -42,15 +42,74 @@ function aplicarGenero(zip) {
   zip.file(alvo, xml);
 }
 
-// Preenche um TEMPLATE .docx (marcado com {{campos}} e {{#flags}}...{{/flags}})
-// usando docxtemplater. Preserva 100% da formatação do .docx original.
+// Mapeamento de marcadores [ENTRE COLCHETES] -> campos de dados (mesma tabela do previewTemplate)
+const MARCADORES_COLCHETES = {
+  'VARA / CIDADE / REGIÃO': 'VARA_CIDADE_REGIAO',
+  'NOME DO RECLAMANTE': 'RECL_NOME',
+  'ESTADO CIVIL': 'RECL_ESTADO_CIVIL',
+  'FUNÇÃO': 'RECL_FUNCAO',
+  'RG': 'RECL_RG',
+  'CPF': 'RECL_CPF',
+  'PIS': 'RECL_PIS',
+  'SÉRIE': 'RECL_SERIE',
+  'CTPS': 'RECL_CTPS',
+  'DATA DE NASCIMENTO': 'RECL_NASCIMENTO',
+  'FILIAÇÃO': 'RECL_FILIACAO',
+  'ENDEREÇO DO RECLAMANTE': 'RECL_ENDERECO',
+  'RAZÃO SOCIAL 1ª RECLAMADA': 'RECLAMADA1_RAZAO',
+  'CNPJ - confirmar': 'RECLAMADA1_CNPJ',
+  'ENDEREÇO - confirmar': 'RECLAMADA1_ENDERECO',
+  'LOCAL DE PRESTAÇÃO': 'LOCAL_PRESTACAO_ENDERECO',
+  'DATA DE ADMISSÃO': 'DATA_ADMISSAO',
+  'DATA DE RESCISÃO': 'DATA_RESCISAO',
+  'SALÁRIO': 'SALARIO',
+  'DESCREVER O FATO CONCRETO DO DANO MORAL': 'DANO_MORAL_FATO_ESPECIFICO',
+  'HORÁRIOS': 'JORNADA_HORARIOS',
+  'ESCALA': 'ESCALA',
+};
+
+// Remove tags XML internas para unir texto fragmentado (ex.: [NOME<b>...</b>] -> [NOME])
+function unirTextosFragmentados(xml) {
+  // Une texto dentro de colchetes que pode estar quebrado por tags <w:r>/<w:t>
+  // Estratégia: remove tags XML dentro de padrões [...]
+  return xml.replace(/\[([^\]]*)\]/g, (match) => {
+    const texto = match.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    return texto; // devolve o colchete limpo para a substituição posterior
+  });
+}
+
+// Substitui marcadores [ENTRE COLCHETES] no XML do docx pelos valores reais.
+function substituirColchetesNoXml(xml, dados) {
+  // 1) Une fragmentos para evitar que tags XML quebrem o match
+  let out = unirTextosFragmentados(xml);
+  // 2) Substitui pelo valor
+  out = out.replace(/\[([^\]]+)\]/g, (match, conteudo) => {
+    const campo = MARCADORES_COLCHETES[conteudo.trim()];
+    const v = campo ? dados[campo] : undefined;
+    return (v != null && v !== '') ? String(v) : match;
+  });
+  return out;
+}
+
+// Preenche um TEMPLATE .docx (marcado com {{campos}}/{{#flags}} OU [MARCADORES])
+// usando docxtemplater + substituição direta de colchetes. Preserva 100% da formatação.
 export function preencherDocxTemplate(arrayBuffer, dados) {
   const zip = new PizZip(arrayBuffer);
+
+  // Substituição direta de [MARCADORES] no XML antes do docxtemplater
+  const alvoXml = 'word/document.xml';
+  const xmlFile = zip.file(alvoXml);
+  if (xmlFile) {
+    let xml = xmlFile.asText();
+    xml = substituirColchetesNoXml(xml, dados);
+    zip.file(alvoXml, xml);
+  }
+
   const doc = new Docxtemplater(zip, {
-    delimiters: { start: '{{', end: '}}' }, // usa {{campo}} e {{#flag}}...{{/flag}}
+    delimiters: { start: '{{', end: '}}' }, // mantém suporte a {{campo}} e {{#flag}}...{{/flag}}
     paragraphLoop: true,
-    linebreaks: true, // quebras de linha (\n) viram <w:br/> nos parágrafos
-    nullGetter: () => '', // campo ausente = vazio (não quebra a renderização)
+    linebreaks: true,
+    nullGetter: () => '',
   });
   doc.render(dados || {});
   const outZip = doc.getZip();
