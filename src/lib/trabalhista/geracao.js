@@ -40,13 +40,14 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
   const urls = [...(fileUrls || [])];
-  if (texto && texto.trim()) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
+  const temMaterial = Boolean((texto && texto.trim()) || urls.length);
+  if (temMaterial) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
   const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
-    texto && texto.trim()
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto, fileUrls: urls }), () => extrairCasoDeTexto(texto, urls), {
+    temMaterial
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto: texto || '', fileUrls: urls }), () => extrairCasoDeTexto(texto || '', urls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({}))
       : Promise.resolve({}),

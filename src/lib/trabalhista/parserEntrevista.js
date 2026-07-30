@@ -101,13 +101,20 @@ const CASO_SCHEMA = {
 };
 
 export async function extrairCasoDeTexto(texto, fileUrls) {
+  const temArquivos = Boolean(fileUrls && fileUrls.length);
+  const temTexto = Boolean(texto && texto.trim());
+  const blocoTexto = temTexto
+    ? `TEXTO DA ENTREVISTA:\n"""\n${texto}\n"""`
+    : (temArquivos
+      ? 'TEXTO DA ENTREVISTA: (vazio — analise exclusivamente o(s) documento(s) anexado(s) abaixo)'
+      : 'TEXTO DA ENTREVISTA: (vazio)');
+  const blocoArquivos = temArquivos
+    ? `\n\nDOCUMENTO(S) ANEXADO(S): leia integralmente o(s) PDF/imagem enviado(s) e extraia TODOS os campos do caso. O documento é uma entrevista assinada pelo cliente — trate como fonte primária.`
+    : '';
   const request = {
-    prompt: `Você é uma especialista sênior em direito trabalhista que analisa entrevistas de empregados para montar petições. Leia TODO o material abaixo (entrevista cru + fatos narrados) e extraia todos os campos com máxima inteligência inferencial — como uma advogada experiente faria.
+    prompt: `Você é uma especialista sênior em direito trabalhista que analisa entrevistas de empregados para montar petições. Leia TODO o material abaixo (entrevista + fatos narrados) e extraia todos os campos com máxima inteligência inferencial — como uma advogada experiente faria.
 
-TEXTO / DOCUMENTOS ANEXADOS:
-"""
-${texto}
-"""
+${blocoTexto}${blocoArquivos}
 
 === REGRAS DE EXTRAÇÃO ===
 
