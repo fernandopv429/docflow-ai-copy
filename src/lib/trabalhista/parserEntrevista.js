@@ -79,8 +79,8 @@ const CASO_SCHEMA = {
     tem_integracao_por_fora: { type: 'boolean', description: 'Pagamento "por fora" (dinheiro/PIX)' },
     tem_periculosidade: { type: 'boolean' },
     tem_assiduidade: { type: 'boolean', description: 'Bônus de assiduidade pago a menor' },
-    tem_vale_transporte: { type: 'boolean', description: 'Ausência de VT nas folgas' },
-    tem_auxilio_alimentacao: { type: 'boolean', description: 'Ausência de auxílio-alimentação nas folgas' },
+    tem_vale_transporte: { type: 'boolean', description: 'Ausência de VT nas folgas trabalhadas (se tinha VT + fez FTs pagas informalmente → true)' },
+    tem_auxilio_alimentacao: { type: 'boolean', description: 'Ausência de VA/VR nas folgas trabalhadas (se tinha VA/VR + fez FTs pagas informalmente → true)' },
     tem_doenca: { type: 'boolean', description: 'Doença ocupacional decorrente do trabalho' },
     tem_estabilidade: { type: 'boolean', description: 'Estabilidade provisória (acompanha doença)' },
     tem_pensao: { type: 'boolean', description: 'Perda/redução da capacidade laborativa' },
@@ -102,27 +102,74 @@ const CASO_SCHEMA = {
 
 export async function extrairCasoDeTexto(texto, fileUrls) {
   const request = {
-    prompt: `Você é um extrator de dados de entrevistas trabalhistas. Leia o texto livre abaixo (resumo da entrevista feito pelo advogado) e preencha os campos do caso.
+    prompt: `Você é uma especialista sênior em direito trabalhista que analisa entrevistas de empregados para montar petições. Leia TODO o material abaixo (entrevista cru + fatos narrados) e extraia todos os campos com máxima inteligência inferencial — como uma advogada experiente faria.
 
-TEXTO:
+TEXTO / DOCUMENTOS ANEXADOS:
 """
 ${texto}
 """
 
-Regras:
-- Extraia SOMENTE o que estiver explícito ou claramente inferível no texto. NÃO invente dados.
-- Omita campos sem informação (não retorne string vazia nem null).
-- Datas em YYYY-MM-DD (interprete formatos brasileiros como 22/01/26 → 2026-01-22).
-- CPF/CNPJ somente números. Valores monetários como número (ex.: 2500.00).
-- tipo_dispensa: "demissão forçada", coação ou perseguição para pedir demissão → nulidade_pedido_demissao; falta grave do empregador → rescisao_indireta; justa causa contestada → reversao_justa_causa.
-- Booleans (tem_*): defina true apenas com suporte no relato.
-- recl_genero: 'M' ou 'F', inferido do nome/relato (para concordância de gênero na peça).
-- maior_remuneracao: preencha só se citada uma remuneração maior que o salário (base do dano moral); senão omita.
-- val_ft = valor de CADA folga trabalhada (se informado em faixa, ex.: "180 a 200", use a média: 190); val_conducao = valor de UMA condução; valor_aux_alimentacao = valor diário; ft_qtd_media = folgas por mês (se faixa, use a média).
-- recl_serie: extraia o número de série da CTPS (campo "serie" ou "Série nº" na entrevista).
-- recl_ctps: somente o número da CTPS (sem a série).
-- dano_fatos: redija de forma objetiva (2-4 frases) SOMENTE se houver fatos no relato; caso contrário, omita.
-- fatos_narrados: liste TODA irregularidade/fato específico mencionado na entrevista, um por item, por mais simples que pareça (descontos indevidos, folgas pagas por fora, desvio/acúmulo, intervalo reduzido, minutos antecedentes/sucedentes, falta de VT/auxílio nas folgas, doença, etc.). Nenhum fato narrado pode ser omitido — a auditoria usa esta lista para garantir que cada fato vire capítulo na minuta.
+=== REGRAS DE EXTRAÇÃO ===
+
+DADOS BÁSICOS:
+- Datas em YYYY-MM-DD (interprete: 14/04/2025 → 2025-04-14; "Sem JUSTA CAUSA: 07/12/2025" → data_rescisao = 2025-12-07).
+- CPF/CNPJ/PIS somente números.
+- recl_serie: número de série da CTPS ("serie: 25795" → "25795"). recl_ctps: só o número da CTPS (sem série).
+- recl_genero: 'M' ou 'F' inferido do nome ("brasileiro/solteiro" → 'M').
+
+SALÁRIO:
+- Extraia o salário mesmo que venha como "Salário: 2148,22" ou "R$ 2.148,22".
+- Se não informado explicitamente MAS a função é vigilante e há CCT conhecida, NÃO invente — deixe em branco.
+
+FOLGAS TRABALHADAS (FT):
+- "5 a 6 FTs" → ft_qtd_media = 5.5 (use a MÉDIA da faixa).
+- "180 a 200" valor das FTs → val_ft = 190.0 (use a MÉDIA da faixa).
+- "pagos fora da folha" / "via pix" → tem_integracao_por_fora = true, valor_por_fora = val_ft (as FTs eram pagas informalmente).
+- tem_ft = true sempre que houver FTs relatadas.
+
+JORNADA E HORAS EXTRAS:
+- Escala 12x36 com horário "18:30 às 07:30" ou "19h às 7h" → tem_adic_noturno = true (labor após 22h é noturno automático).
+- "período antecedente 30 min" + "sucedente 30 min" → prorrogacao_jornada = "30 minutos antes e 30 minutos após a jornada" + escala = "12x36 com minutos antecedentes e sucedentes".
+- "média de 1h de HE" → prorrogacao_jornada inclui isso.
+- Intervalo com "Rádio HT sempre ligado" = intervalo suprimido/reduzido (trabalhador não descansa de fato). intervalo_usufruido = "10 a 15 minutos com rádio HT sempre ligado (sem real descanso)".
+
+ACÚMULO/DESVIO DE FUNÇÃO:
+- Acúmulo = exerceu ALÉM das suas funções habituais outras atribuições (ex: Prevenção de Perdas, rondas, recepção).
+- Desvio = exerceu funções de cargo SUPERIOR/DIVERSO do contratado.
+- "passou a acumular funções de Prevenção de Perdas: conferências de mercadorias, controle de validade, registros, conferência de cargas, controle de paletes" → tem_acumulo = true, acumulo_atividades = descrição completa.
+- Defina tem_acumulo = true com suporte explícito; tem_desvio = true se exercia função claramente superior/diferente.
+
+PERICULOSIDADE:
+- Vigilante → tem_periculosidade = true POR PADRÃO (Lei 7.102/83 + Portaria MTE 1885/2013 — categoria profissional de vigilância tem adicional de periculosidade mesmo sem armamento pessoal quando guarda patrimônio).
+- Só omita se o texto EXPLICITAR que não é da categoria vigilância.
+
+DESCONTO INDEVIDO DE CONSIGNADO:
+- "desconto integral do saldo devedor do empréstimo consignado na rescisão" → fatos_narrados deve incluir esse fato; dano_fatos deve mencionar.
+- NUNCA omita esse fato dos fatos_narrados.
+
+PARTICIPAÇÃO NOS LUCROS (PL):
+- "não recebia PL" → adicionar em fatos_narrados: "não recebimento de PLR (Participação nos Lucros e Resultados)" e considerar tese de PLR devida pela CCT.
+
+VALE-TRANSPORTE / VALE-REFEIÇÃO / VALE-ALIMENTAÇÃO:
+- Se marcado "SIM" na entrevista → o benefício ERA fornecido normalmente; verifique se era suprimido nas folgas.
+- Se folgas eram trabalhadas e pagas informalmente, VT/alimentação nas folgas provavelmente não eram pagos.
+- tem_vale_transporte = true se há FTs e VT era fornecido (presunção de não pagamento nas folgas trabalhadas).
+- tem_auxilio_alimentacao = true se há FTs e VA/VR era fornecido (mesma presunção).
+
+TIPO DE DISPENSA:
+- "Sem justa causa" marcado no formulário → tipo_dispensa = "sem_justa_causa".
+- "pedido de demissão forçado/coagido/constrangido" → nulidade_pedido_demissao.
+- Falta grave patronal → rescisao_indireta.
+
+DANO MORAL:
+- Acúmulo de funções sem contraprestação + desconto indevido de consignado = fatos concretos para dano moral.
+- tem_dano_moral = true se há ao menos 1 fato concreto (humilhação, assédio, desconto indevido, doença sem comunicação, etc.).
+- dano_fatos: redija 2-4 frases objetivas descrevendo os fatos concretos do dano (inclua o desconto indevido do consignado e/ou o acúmulo sem compensação).
+
+FATOS NARRADOS:
+- Liste TODA irregularidade/fato específico mencionado, um por item, sem omitir NADA:
+  ex.: "folgas trabalhadas pagas informalmente via PIX", "acúmulo de função (Prevenção de Perdas) sem contraprestação", "intervalo intrajornada suprimido (rádio HT sempre ligado)", "minutos antecedentes e sucedentes não pagos", "desconto integral de empréstimo consignado na rescisão", "não recebimento de PLR", "periculosidade não remunerada", "vale-transporte/alimentação não pago nas folgas trabalhadas", etc.
+- A auditoria cruza esta lista com os capítulos da minuta — nenhum fato pode faltar.
 
 Responda APENAS com o objeto JSON.`,
     model: 'gemini_3_flash',

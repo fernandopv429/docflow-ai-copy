@@ -66,18 +66,31 @@ function formatarTranscript(transcript) {
 }
 
 export function buildChatPrompt({ transcript, modelos, attrsAtuais }) {
-  return `Você é um assistente jurídico trabalhista que conversa com um advogado para reunir as informações de uma ENTREVISTA e, ao final, gerar uma petição inicial a partir de um modelo de referência.
+  return `Você é uma especialista sênior em direito trabalhista que conversa com um advogado para montar o caso antes de gerar a petição inicial. Você tem expertise igual a uma advogada de 15 anos — sabe cruzar informações, inferir teses automaticamente e identificar irregularidades que o advogado nem sempre menciona explicitamente.
 
-CONVERSE em português, de forma objetiva e cordial (estilo chat). Seu papel AGORA é entender o caso e coletar o que falta — NÃO redija a petição nesta etapa (o sistema cuida da redação quando você sinalizar).
+CONVERSE em português, de forma objetiva e profissional (estilo chat). Seu papel é entender o caso, INFERIR o máximo possível dos dados disponíveis e coletar APENAS o que ainda falta. NÃO redija a petição nesta etapa.
 
-Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição completa: qualificação do reclamante (nome, nacionalidade, estado civil, RG, CPF, PIS, CTPS/Série, data de nascimento, filiação, endereço); reclamada(s) com razão social e CNPJ (e a tomadora, se houver); local de prestação dos serviços (define a competência); função e sindicato/CCT aplicável; datas de admissão e rescisão; salário e a maior remuneração na função (para dano moral e cálculos); jornada/escala; modalidade de rescisão; e as verbas/teses pretendidas. Faça poucas perguntas por vez e sinalize claramente o que ainda falta.
+=== INFERÊNCIAS AUTOMÁTICAS (faça SEMPRE) ===
+• VIGILANTE → periculosidade automática (Lei 7.102/83 + Portaria MTE 1885/2013), mesmo sem armamento.
+• Escala 12x36 com horário noturno (ex: 19h às 7h, 18:30 às 7:30) → adicional noturno automático.
+• Folgas trabalhadas pagas "por fora" / "via pix" → integração salarial + reflexos.
+• "5 a 6 FTs" → ft_qtd_media = 5.5 (média); "180 a 200" → val_ft = 190 (média).
+• "Rádio HT sempre ligado" no intervalo → intervalo intrajornada suprimido de fato.
+• VT/VA/VR informados + folgas trabalhadas → VT e alimentação não pagos nas folgas (tese automática).
+• "Não recebia PL/PLR" → PLR devida pela CCT (tese).
+• "Desconto integral de consignado na rescisão" → desconto indevido (tese + dano moral).
+• Acúmulo de Prevenção de Perdas / funções adicionais → acúmulo de função sem contraprestação.
+• Minutos antecedentes/sucedentes (30 min antes, 30 min depois) → horas extras além da jornada contratual.
 
-Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
+=== DADOS A COLETAR (quando não informado) ===
+Qualificação do reclamante (nome, CPF, RG, PIS, CTPS/Série, nascimento, filiação, endereço); reclamada(s) com CNPJ; tomadora (se houver); local de prestação (define competência); função; datas de admissão e rescisão; salário; escala/jornada; modalidade de rescisão; verbas/teses pretendidas. Faça poucas perguntas por vez.
 
-MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
+Extraia em "atributos" TUDO inferível. Defina "pronto_para_gerar" true quando o advogado pedir a minuta OU quando já houver: reclamante identificado, função, reclamada com CNPJ, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
+
+MODELOS DE REFERÊNCIA DISPONÍVEIS:
 ${resumoModelos(modelos)}
 
-ATRIBUTOS JÁ CONFIRMADOS EM ETAPAS ANTERIORES:
+ATRIBUTOS JÁ CONFIRMADOS:
 ${JSON.stringify(attrsAtuais || {})}
 
 CONVERSA ATÉ AGORA:
@@ -123,11 +136,19 @@ function inferirAtributosEntrevista(transcript) {
       pendencias = pendencias.filter((item) => !item.startsWith('CPF'));
     }
   }
-  const funcao = texto.match(/\b(vigilante|porteiro|controlador(?:a)? de acesso)\b/i)?.[1];
+  const funcao = texto.match(/\b(vigilante|porteiro|controlador(?:a)? de acesso|vigilância)\b/i)?.[1];
   const teses = [];
-  if (/dano[s]? moral|persegui|ass[eé]dio/i.test(texto)) teses.push('Dano moral');
-  if (/intrajornada|intervalo/i.test(texto)) teses.push('Intervalo intrajornada (art. 71 CLT)');
-  if (/folga[s]? trabalhada/i.test(texto)) teses.push('Folgas trabalhadas/DSR');
+  if (/dano[s]? moral|persegui|ass[eé]dio|humilha/i.test(texto)) teses.push('Dano moral');
+  if (/intrajornada|intervalo|rádio ht|radio ht|ht\s+ligado/i.test(texto)) teses.push('Intervalo intrajornada suprimido (art. 71 CLT)');
+  if (/folga[s]?\s*(trabalhada|laborada)/i.test(texto)) teses.push('Folgas trabalhadas/DSR');
+  if (/horas?\s*extras?|hora[s]?\s*extra|antecedente|sucedente|HE\b/i.test(texto)) teses.push('Horas extras');
+  if (/acúmulo|acumulo|prevenção de perdas|prevencao de perdas|desvio de fun/i.test(texto)) teses.push('Acúmulo/desvio de função');
+  if (/consignado|desconto indevido/i.test(texto)) teses.push('Desconto indevido de consignado na rescisão');
+  if (/pl\b|plr\b|participação nos lucros|participacao nos lucros/i.test(texto)) teses.push('PLR não recebida');
+  if (/periculosidade|vigilante/i.test(texto)) teses.push('Periculosidade (Lei 7.102/83)');
+  if (/adicional noturno|noturno|19h|18:30|18h/i.test(texto)) teses.push('Adicional noturno');
+  if (/vale.transporte|vale.alimenta|vr\b|va\b/i.test(texto)) teses.push('VT/alimentação nas folgas trabalhadas');
+  if (/12\s*[xX]\s*36/i.test(texto)) teses.push('Descaracterização da escala 12x36 (Súmula 85 TST)');
 
   const atributos = {
     ...(funcao && { funcao }),

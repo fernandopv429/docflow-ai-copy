@@ -90,6 +90,35 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
       if (!caso.sindicato && dadosCct.meta.sindicato_laboral) caso.sindicato = dadosCct.meta.sindicato_laboral;
       if (dadosCct.meta.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
     }
+    // Enriquecer automaticamente com valores da CCT quando não informados na entrevista
+    if (dadosCct?.clausulas?.length) {
+      // Extrai valor de VT/condução das cláusulas CCT se não informado
+      if (!caso.val_conducao) {
+        const clausulaVt = dadosCct.clausulas.find((c) =>
+          /vale.transporte|condu[çc][ãa]o/i.test(c.ementa || c.texto || '')
+        );
+        if (clausulaVt) {
+          const matchValor = (clausulaVt.ementa || clausulaVt.texto || '').match(/R\$\s*([\d.,]+)/i);
+          if (matchValor) {
+            const v = parseFloat(matchValor[1].replace(/\./g, '').replace(',', '.'));
+            if (v > 0 && v < 30) { caso.val_conducao = v; notify(`Valor de condução obtido da CCT: R$ ${v}`); }
+          }
+        }
+      }
+      // Extrai valor de auxílio-alimentação das cláusulas CCT se não informado
+      if (!caso.valor_aux_alimentacao) {
+        const clausulaAlim = dadosCct.clausulas.find((c) =>
+          /alimenta[çc][ãa]o|refei[çc][ãa]o/i.test(c.ementa || c.texto || '')
+        );
+        if (clausulaAlim) {
+          const matchValor = (clausulaAlim.ementa || clausulaAlim.texto || '').match(/R\$\s*([\d.,]+)/i);
+          if (matchValor) {
+            const v = parseFloat(matchValor[1].replace(/\./g, '').replace(',', '.'));
+            if (v > 0 && v < 100) { caso.valor_aux_alimentacao = v; notify(`Valor de auxílio-alimentação obtido da CCT: R$ ${v}`); }
+          }
+        }
+      }
+    }
   }
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
