@@ -191,10 +191,10 @@ export default function GerarPorEntrevista() {
     setGenerating(false);
   };
 
-  const handleSend = async () => {
-    if (sending || generating || (!input.trim() && files.length === 0)) return;
-    const text = input.trim();
-    const attached = files;
+  const handleSend = async (opts = {}) => {
+    const text = opts.texto !== undefined ? opts.texto : input.trim();
+    const attached = opts.arquivos !== undefined ? opts.arquivos : files;
+    if (sending || generating || (!text && attached.length === 0)) return;
     const novasMsgs = [...messages, { role: 'user', text, files: attached.map((f) => f.name) }];
     setMessages(novasMsgs);
     setInput('');
@@ -439,8 +439,13 @@ export default function GerarPorEntrevista() {
                   accept=".pdf,.jpg,.jpeg,.png,.docx,.txt"
                   className="hidden"
                   onChange={(e) => {
-                    setFiles((prev) => [...prev, ...Array.from(e.target.files)]);
+                    const novos = Array.from(e.target.files);
                     e.target.value = '';
+                    if (!novos.length) return;
+                    setFiles((prev) => [...prev, ...novos]);
+                    // Anexar a entrevista em PDF/DOCX dispara a leitura automática
+                    // (quando não há texto sendo digitado) — não é preciso "enviar".
+                    if (!input.trim()) handleSend({ texto: '', arquivos: novos });
                   }}
                 />
               </label>
