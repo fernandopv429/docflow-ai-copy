@@ -42,16 +42,24 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
   const urls = [...(fileUrls || [])];
   const temMaterial = Boolean((texto && texto.trim()) || urls.length);
   if (temMaterial) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
-  const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
+  const [dadosReceita, dadosCep, dadosDatajud, extracao] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
     temMaterial
       ? withRuntimeCache('extracao-caso', runtimeCacheKey({ texto: texto || '', fileUrls: urls }), () => extrairCasoDeTexto(texto || '', urls), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
-        }).catch(() => ({}))
-      : Promise.resolve({}),
+        }).catch(() => ({ caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Falha na extração estruturada.' }] }))
+      : Promise.resolve({ caso: {}, alertas: [] }),
   ]);
+  const caso = extracao?.caso || {};
+  const alertasExtracao = extracao?.alertas || [];
+  if (alertasExtracao.length) {
+    const bloqueantes = alertasExtracao.filter((a) => a.severidade === 'BLOQUEANTE');
+    const atencoes = alertasExtracao.filter((a) => a.severidade === 'ATENCAO');
+    if (bloqueantes.length) notify(`⚠ ${bloqueantes.length} alerta(s) bloqueante(s) na extração.`);
+    if (atencoes.length) notify(`⚠ ${atencoes.length} inconsistência(s) validadas na extração (teses sem apoio foram desativadas).`);
+  }
 
   // 2ª passada: CNPJs/CEPs que o parser extraiu do PDF (caso.recl*_cnpj /
   // endereços com CEP) mas não estavam no texto digitado nem nos attrs da IA.
@@ -149,6 +157,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
     dadosCct,
     calculos,
     caso,
+    alertasExtracao,
     modeloSemelhante: modeloSemelhante ? { titulo: modeloSemelhante.titulo } : null,
   };
 }

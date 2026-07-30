@@ -1,9 +1,18 @@
 import { base44 } from '@/api/base44Client';
 import { traceAiCall } from '@/lib/sessionTrace';
 
-// Agente extrator: converte o texto livre da entrevista nos campos usados pelo
-// MODELO-MESTRE (via dadosTemplate.js). Extrai dados estruturados, os poucos
-// trechos livres do caso (fatos do dano moral) e as flags das teses.
+// ============================================================
+// Agente extrator: converte texto livre e/ou PDF da entrevista
+// nos campos usados pelo MODELO-MESTRE (via dadosTemplate.js).
+//
+// Princípios aplicados:
+// 1. VALIDAÇÃO DE INPUTS — null/undefined/vazio tratados com fallback seguro.
+// 2. REGRAS CONDICIONAIS — cada tese só permanece ativa se TODOS os campos
+//    de apoio estiverem validados; inconsistências viram alertas estruturados.
+// 3. PADRONIZAÇÃO DO RETORNO — objeto JSON limpo, aderente ao schema,
+//    sem textos explicativos/saudações.
+// ============================================================
+
 const CASO_SCHEMA = {
   type: 'object',
   properties: {
@@ -69,7 +78,7 @@ const CASO_SCHEMA = {
     periodo_13: { type: 'string', description: 'Período do 13º proporcional, se citado' },
     periodo_ferias_vencidas: { type: 'string', description: 'Período das férias vencidas, se houver' },
 
-    // Flags das teses (true APENAS com suporte no relato)
+    // Flags das teses (true APENAS com suporte no relato + campos de apoio validados)
     tem_acumulo: { type: 'boolean' },
     tem_desvio: { type: 'boolean', description: 'Exercia função superior/diversa (desvio de função)' },
     tem_gratificacao: { type: 'boolean', description: 'Vigilante condutor sem gratificação de 10% (cláusula 3ª)' },
@@ -100,19 +109,169 @@ const CASO_SCHEMA = {
   },
 };
 
+// ============================================================
+// Helpers de validação / normalização (fallbacks seguros)
+// ============================================================
+function ehVazio(v) {
+  return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+}
+
+function comoString(v) {
+  if (ehVazio(v)) return undefined;
+  const s = String(v).trim();
+  return s || undefined;
+}
+
+function comoNumero(v) {
+  if (ehVazio(v)) return undefined;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+  const limpo = String(v).replace(/R\$\s*/gi, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+  const n = parseFloat(limpo);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function comoBoolean(v) {
+  if (typeof v === 'boolean') return v;
+  if (v === 'true' || v === 1) return true;
+  if (v === 'false' || v === 0) return false;
+  return undefined;
+}
+
+function comoArrayStrings(v) {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x).trim()).filter(Boolean);
+}
+
+// ============================================================
+// Regras de dependência: cada flag só permanece TRUE se TODOS
+// os campos de apoio estiverem presentes e validados.
+// Inconsistências → alerta estruturado (não interrompe execução).
+// ============================================================
+const REGRAS_TESES = [
+  { flag: 'tem_ft', exige: ['ft_qtd_media'], descricao: 'Folgas trabalhadas ativadas sem quantitativo médio (ft_qtd_media).' },
+  { flag: 'tem_acumulo', exige: ['acumulo_atividades'], descricao: 'Acúmulo de função ativado sem descrição das atividades.' },
+  { flag: 'tem_desvio', exige: ['desvio_atividades'], descricao: 'Desvio de função ativado sem descrição das atividades.' },
+  { flag: 'tem_assiduidade', exige: ['assiduidade_prometido'], descricao: 'Assiduidade ativada sem valor prometido.' },
+  { flag: 'tem_doenca', exige: ['doenca_descricao'], descricao: 'Doença ativada sem descrição.' },
+  { flag: 'tem_integracao_por_fora', exige: ['valor_por_fora'], descricao: 'Integração por fora ativada sem valor.' },
+  { flag: 'tem_dano_moral', exige: ['dano_fatos'], descricao: 'Dano moral ativado sem fato concreto descrito.' },
+  { flag: 'tem_salarios_aberto', exige: ['salarios_aberto'], descricao: 'Salários em aberto ativados sem indicação dos meses.' },
+  { flag: 'tem_estabilidade', exige: ['doenca_descricao'], descricao: 'Estabilidade ativada sem doença descrita (a estabilidade acompanha a doença).' },
+];
+
+// Campos do schema categorizados por tipo para coerção determinística.
+const CAMPOS_STRING = [
+  'titulo', 'recl_nome', 'recl_genero', 'recl_nacionalidade', 'recl_estado_civil', 'recl_cpf', 'recl_rg',
+  'recl_pis', 'recl_ctps', 'recl_serie', 'recl_nascimento', 'recl_filiacao', 'recl_endereco',
+  'recl1_nome', 'recl1_cnpj', 'recl1_logradouro', 'recl2_nome', 'recl2_cnpj', 'local_prestacao', 'comarca_uf',
+  'data_admissao', 'data_rescisao', 'funcao', 'tipo_dispensa', 'jornada_horario', 'escala',
+  'intervalo_usufruido', 'prorrogacao_jornada', 'acumulo_atividades', 'desvio_atividades',
+  'salarios_aberto', 'doenca_descricao', 'cct_ano', 'cct_clausulas', 'cct_clausula_multa',
+  'periodo_ferias_prop', 'periodo_13', 'periodo_ferias_vencidas', 'dano_fatos',
+];
+const CAMPOS_NUMERO = [
+  'salario', 'maior_remuneracao', 'val_ft', 'val_conducao', 'ft_qtd_media',
+  'assiduidade_prometido', 'assiduidade_pago', 'assiduidade_diferenca',
+  'valor_por_fora', 'valor_aux_alimentacao',
+];
+const CAMPOS_BOOLEAN = [
+  'tem_acumulo', 'tem_desvio', 'tem_gratificacao', 'tem_dez_min_cct', 'tem_salarios_aberto',
+  'tem_adic_noturno', 'tem_integracao_por_fora', 'tem_periculosidade', 'tem_assiduidade',
+  'tem_vale_transporte', 'tem_auxilio_alimentacao', 'tem_doenca', 'tem_estabilidade',
+  'tem_pensao', 'tem_ft', 'tem_ferias_vencidas', 'tem_dano_moral',
+];
+
+// ============================================================
+// Normaliza o retorno bruto da IA: aplica fallbacks seguros,
+// valida regras condicionais e coleta alertas estruturados.
+// Retorna { caso, alertas } — caso sempre aderente ao schema.
+// ============================================================
+function normalizarCaso(bruto) {
+  const alertas = [];
+  const caso = {};
+
+  // 1) Coerção de tipos com fallback (undefined = campo ausente, nunca null/'')
+  for (const c of CAMPOS_STRING) {
+    const v = comoString(bruto?.[c]);
+    if (v !== undefined) caso[c] = v;
+  }
+  for (const c of CAMPOS_NUMERO) {
+    const v = comoNumero(bruto?.[c]);
+    if (v !== undefined) caso[c] = v;
+  }
+  for (const c of CAMPOS_BOOLEAN) {
+    const v = comoBoolean(bruto?.[c]);
+    if (v !== undefined) caso[c] = v;
+  }
+  caso.fatos_narrados = comoArrayStrings(bruto?.fatos_narrados);
+
+  // 2) Validação das regras condicionais — desativa flag inconsistente + alerta
+  for (const regra of REGRAS_TESES) {
+    if (caso[regra.flag] !== true) continue;
+    const faltantes = regra.exige.filter((c) => ehVazio(caso[c]));
+    if (faltantes.length) {
+      caso[regra.flag] = false;
+      alertas.push({
+        severidade: 'ATENCAO',
+        flag: regra.flag,
+        campos_faltantes: faltantes,
+        descricao: regra.descricao,
+      });
+    }
+  }
+
+  // 3) Consistências cruzadas — alertas informativos (não desativam)
+  if (caso.tem_periculosidade && caso.funcao && !/vigilante|vigil/i.test(caso.funcao)) {
+    alertas.push({
+      severidade: 'INFO',
+      flag: 'tem_periculosidade',
+      descricao: `Periculosidade ativa mas a função "${caso.funcao}" não parece ser de vigilância — confirmar enquadramento.`,
+    });
+  }
+  if (caso.data_admissao && caso.data_rescisao && caso.data_rescisao < caso.data_admissao) {
+    alertas.push({
+      severidade: 'ATENCAO',
+      campos: ['data_admissao', 'data_rescisao'],
+      descricao: 'Data de rescisão anterior à data de admissão — verificar datas informadas.',
+    });
+  }
+  if (caso.recl1_cnpj && caso.recl1_cnpj.replace(/\D/g, '').length !== 14) {
+    alertas.push({
+      severidade: 'ATENCAO',
+      campo: 'recl1_cnpj',
+      descricao: 'CNPJ da 1ª reclamada não possui 14 dígitos — conferir na Receita.',
+    });
+  }
+
+  return { caso, alertas };
+}
+
+// ============================================================
+// Função principal: extrai o caso de texto livre e/ou PDF.
+// Nunca lança — retorna { caso: {}, alertas: [] } em qualquer falha.
+// ============================================================
 export async function extrairCasoDeTexto(texto, fileUrls) {
-  const temArquivos = Boolean(fileUrls && fileUrls.length);
-  const temTexto = Boolean(texto && texto.trim());
+  // --- 1) Validação de inputs ---
+  const textoSeguro = typeof texto === 'string' ? texto.trim() : '';
+  const urlsSeguras = Array.isArray(fileUrls) ? fileUrls.filter(Boolean) : [];
+  const temTexto = Boolean(textoSeguro);
+  const temArquivos = Boolean(urlsSeguras.length);
+
+  // Fallback: sem material algum, retorna vazio (não interrompe o fluxo)
+  if (!temTexto && !temArquivos) {
+    return { caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Sem texto e sem documento anexado — nada a extrair.' }] };
+  }
+
+  // --- 2) Montagem do prompt (sem saudações no output, só JSON) ---
   const blocoTexto = temTexto
-    ? `TEXTO DA ENTREVISTA:\n"""\n${texto}\n"""`
-    : (temArquivos
-      ? 'TEXTO DA ENTREVISTA: (vazio — analise exclusivamente o(s) documento(s) anexado(s) abaixo)'
-      : 'TEXTO DA ENTREVISTA: (vazio)');
+    ? `TEXTO DA ENTREVISTA:\n"""\n${textoSeguro}\n"""`
+    : 'TEXTO DA ENTREVISTA: (vazio — analise exclusivamente o(s) documento(s) anexado(s))';
   const blocoArquivos = temArquivos
     ? `\n\nDOCUMENTO(S) ANEXADO(S): leia integralmente o(s) PDF/imagem enviado(s) e extraia TODOS os campos do caso. O documento é uma entrevista assinada pelo cliente — trate como fonte primária.`
     : '';
+
   const request = {
-    prompt: `Você é uma especialista sênior em direito trabalhista que analisa entrevistas de empregados para montar petições. Leia TODO o material abaixo (entrevista + fatos narrados) e extraia todos os campos com máxima inteligência inferencial — como uma advogada experiente faria.
+    prompt: `Você é uma especialista sênior em direito trabalhista que analisa entrevistas de empregados para montar petições. Leia TODO o material abaixo e extraia todos os campos com máxima inteligência inferencial — como uma advogada experiente faria.
 
 ${blocoTexto}${blocoArquivos}
 
@@ -178,20 +337,27 @@ FATOS NARRADOS:
   ex.: "folgas trabalhadas pagas informalmente via PIX", "acúmulo de função (Prevenção de Perdas) sem contraprestação", "intervalo intrajornada suprimido (rádio HT sempre ligado)", "minutos antecedentes e sucedentes não pagos", "desconto integral de empréstimo consignado na rescisão", "não recebimento de PLR", "periculosidade não remunerada", "vale-transporte/alimentação não pago nas folgas trabalhadas", etc.
 - A auditoria cruza esta lista com os capítulos da minuta — nenhum fato pode faltar.
 
-Responda APENAS com o objeto JSON.`,
+=== RETORNO ===
+Responda APENAS com o objeto JSON. NÃO inclua introduções, saudações, comentários ou qualquer texto fora do JSON. Campos sem informação: omita (não retorne null, "" ou placeholders).`,
     model: 'gemini_3_flash',
     response_json_schema: CASO_SCHEMA,
   };
-  if (fileUrls?.length) request.file_urls = fileUrls;
-  const dados = await traceAiCall('Extração estruturada do caso', request, () =>
-    base44.integrations.Core.InvokeLLM(request)
-  );
+  if (urlsSeguras.length) request.file_urls = urlsSeguras;
 
-  // Remove valores vazios para não sobrescrever campos com lixo
-  const limpo = {};
-  for (const [k, v] of Object.entries(dados || {})) {
-    if (v === null || v === undefined || v === '') continue;
-    limpo[k] = v;
+  // --- 3) Chamada à IA com fallback estruturado (nunca lança) ---
+  let bruto;
+  try {
+    bruto = await traceAiCall('Extração estruturada do caso', request, () =>
+      base44.integrations.Core.InvokeLLM(request)
+    );
+  } catch (erro) {
+    return {
+      caso: {},
+      alertas: [{ severidade: 'BLOQUEANTE', descricao: `Falha na extração pela IA: ${erro?.message || 'erro desconhecido'}` }],
+    };
   }
-  return limpo;
+
+  // --- 4) Normalização + validação de regras + alertas ---
+  const { caso, alertas } = normalizarCaso(bruto);
+  return { caso, alertas };
 }
