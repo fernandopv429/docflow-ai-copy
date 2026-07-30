@@ -46,27 +46,9 @@ export async function consultarCnpj(cnpj) {
   const digits = (cnpj || '').replace(/\D/g, '');
   if (digits.length !== 14) return { cnpj, erro: 'CNPJ inválido (precisa de 14 dígitos)' };
   try {
-    const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
-    if (resp.status === 404) return { cnpj: formatarCnpj(digits), erro: 'não encontrado na Receita' };
-    if (!resp.ok) return { cnpj: formatarCnpj(digits), erro: `erro HTTP ${resp.status}` };
-    const d = await resp.json();
-    const cep = (d.cep || '').replace(/\D/g, '');
-    const endereco = [
-      `${d.descricao_tipo_de_logradouro || ''} ${d.logradouro || ''}`.trim(),
-      d.numero,
-      d.complemento,
-      d.bairro,
-      [d.municipio, d.uf].filter(Boolean).join('/'),
-    ]
-      .filter(Boolean)
-      .join(', ');
-    return {
-      cnpj: formatarCnpj(digits),
-      razao_social: d.razao_social || '',
-      endereco,
-      cep: cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep,
-      situacao: d.descricao_situacao_cadastral || '',
-    };
+    const resp = await base44.functions.invoke('cnpj', { cnpj: digits });
+    const d = resp?.data ?? resp;
+    return d || { cnpj: formatarCnpj(digits), erro: 'sem retorno da função' };
   } catch (e) {
     return { cnpj: formatarCnpj(digits), erro: 'falha de rede ao consultar a Receita' };
   }
@@ -103,43 +85,13 @@ export async function consultarCep(cep) {
   const digits = (cep || '').replace(/\D/g, '');
   if (digits.length !== 8) return { cep, erro: 'CEP inválido (precisa de 8 dígitos)' };
   const fmt = `${digits.slice(0, 5)}-${digits.slice(5)}`;
-  // 1) ViaCEP (traz município + código IBGE)
   try {
-    const resp = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
-    if (resp.ok) {
-      const d = await resp.json();
-      if (!d.erro) {
-        return {
-          cep: fmt,
-          logradouro: d.logradouro || '',
-          bairro: d.bairro || '',
-          municipio: d.localidade || '',
-          uf: d.uf || '',
-          ibge: d.ibge || '',
-        };
-      }
-    }
+    const resp = await base44.functions.invoke('cep', { cep: digits });
+    const d = resp?.data ?? resp;
+    return d || { cep: fmt, erro: 'sem retorno da função' };
   } catch (e) {
-    // segue para o fallback
+    return { cep: fmt, erro: 'falha de rede ao consultar o CEP' };
   }
-  // 2) Fallback BrasilAPI
-  try {
-    const resp = await fetch(`https://brasilapi.com.br/api/cep/v1/${digits}`);
-    if (resp.ok) {
-      const d = await resp.json();
-      return {
-        cep: fmt,
-        logradouro: d.street || '',
-        bairro: d.neighborhood || '',
-        municipio: d.city || '',
-        uf: d.state || '',
-        ibge: '',
-      };
-    }
-  } catch (e) {
-    // ignora
-  }
-  return { cep: fmt, erro: 'não encontrado' };
 }
 
 export async function enriquecerCeps(ceps) {
