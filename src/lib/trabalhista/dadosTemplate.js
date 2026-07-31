@@ -123,15 +123,29 @@ function hojeExtenso() {
   return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
+// Rótulo do item calculado (mathUtils) -> campo de PERÍODO (avos) do template.
+// A "memoria" desses itens já traz o número de avos usado no cálculo do VALOR_*
+// correspondente (ex.: "9/12 avos + 1/3 (proj. aviso prévio)") — usar como fonte
+// do período evita que o texto exibido ("X/12") divirja do valor R$ realmente
+// pedido, que é o que acontecia quando PERIODO_13/PERIODO_FERIAS_PROP vinham de
+// um campo de texto livre extraído pela IA a partir da entrevista.
+const MEMORIA_CAMPO = {
+  '13º proporcional': 'PERIODO_13',
+  'Férias proporcionais + 1/3': 'PERIODO_FERIAS_PROP',
+};
+
 export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dadosReceita = [], dadosCep = [] } = {}) {
   const dados = {};
 
   // 1) Valores determinísticos
   let somaCausa = 0;
+  const periodosCalculados = {};
   for (const c of calculos || []) {
     if (c.valor == null) continue;
     const campo = CALC_CAMPO[c.item];
     if (campo) dados[campo] = formatBRL(c.valor);
+    const campoPeriodo = MEMORIA_CAMPO[c.item];
+    if (campoPeriodo && c.memoria) periodosCalculados[campoPeriodo] = c.memoria;
     somaCausa += Number(c.valor) || 0;
   }
   const valorCausa = brlComExtenso(round2(Math.min(somaCausa, TETO_VALOR_CAUSA)));
