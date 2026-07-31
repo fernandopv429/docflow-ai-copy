@@ -188,8 +188,9 @@ export function calcularVerbasCaso(caso = {}) {
   if (ap) itens.push({ item: 'Aviso prévio indenizado', memoria: `${ap.dias} dias (Lei 12.506/2011)`, valor: ap.valor });
   const rescisaoProjetada = dataRescisaoProjetada(caso.data_admissao, caso.data_rescisao, anos);
   const dataFim = rescisaoProjetada || caso.data_rescisao;
-  // 13º: conta o último mês projetado pelo aviso indenizado (ex.: 9/12 de 2025 + 1/12 de 2026)
-  const avos13 = salario ? avosEntreDatas(caso.data_admissao, dataFim, true) : null;
+  // 13º: mês conta só se ≥15 dias. A projeção do aviso só amplia a data final;
+  // o último mês projetado NÃO é forçado (6 dias em jan. NÃO viram 1/12).
+  const avos13 = salario ? avosEntreDatas(caso.data_admissao, dataFim, false) : null;
   if (avos13 != null) itens.push({ item: '13º proporcional', memoria: `${avos13}/12 avos (proj. aviso prévio)`, valor: round2((salario / 12) * avos13) });
   // Férias: período aquisitivo — só conta mês com ≥15 dias (projeção não força o último mês)
   const avosFerias = salario ? avosEntreDatas(caso.data_admissao, dataFim, false) : null;

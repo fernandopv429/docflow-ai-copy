@@ -105,8 +105,18 @@ function corrigirMunicipio(nome) {
   return CORRECOES_MUNICIPIO[String(nome).toUpperCase()] || nome;
 }
 
-function localPrestacao(dadosCep = []) {
-  const v = (dadosCep || []).find((d) => d && !d.erro && d.municipio);
+function cepDoEndereco(end) {
+  const m = /(\d{5})-?(\d{3})/.exec(String(end || ''));
+  return m ? `${m[1]}${m[2]}` : null;
+}
+
+// Competência = local da PRESTAÇÃO DE SERVIÇOS (art. 651 CLT), NÃO a residência
+// do empregado. Usa o CEP do endereço de prestação para achar o município/UF.
+function localPrestacao(caso, dadosCep = []) {
+  const cepLocal = cepDoEndereco(caso?.local_prestacao);
+  const v = (dadosCep || []).find(
+    (d) => d && !d.erro && d.municipio && (!cepLocal || String(d.cep || '').replace(/\D/g, '') === cepLocal)
+  );
   return v ? { municipio: corrigirMunicipio(v.municipio), uf: v.uf } : null;
 }
 
@@ -123,29 +133,15 @@ function hojeExtenso() {
   return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
-// Rótulo do item calculado (mathUtils) -> campo de PERÍODO (avos) do template.
-// A "memoria" desses itens já traz o número de avos usado no cálculo do VALOR_*
-// correspondente (ex.: "9/12 avos + 1/3 (proj. aviso prévio)") — usar como fonte
-// do período evita que o texto exibido ("X/12") divirja do valor R$ realmente
-// pedido, que é o que acontecia quando PERIODO_13/PERIODO_FERIAS_PROP vinham de
-// um campo de texto livre extraído pela IA a partir da entrevista.
-const MEMORIA_CAMPO = {
-  '13º proporcional': 'PERIODO_13',
-  'Férias proporcionais + 1/3': 'PERIODO_FERIAS_PROP',
-};
-
 export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dadosReceita = [], dadosCep = [] } = {}) {
   const dados = {};
 
   // 1) Valores determinísticos
   let somaCausa = 0;
-  const periodosCalculados = {};
   for (const c of calculos || []) {
     if (c.valor == null) continue;
     const campo = CALC_CAMPO[c.item];
     if (campo) dados[campo] = formatBRL(c.valor);
-    const campoPeriodo = MEMORIA_CAMPO[c.item];
-    if (campoPeriodo && c.memoria) periodosCalculados[campoPeriodo] = c.memoria;
     somaCausa += Number(c.valor) || 0;
   }
   const valorCausa = brlComExtenso(round2(Math.min(somaCausa, TETO_VALOR_CAUSA)));
@@ -154,13 +150,29 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.VALOR_CAUSA = valorCausa;
   dados.VALOR_TOTAL_PEDIDOS = valorCausa;
 
+  // Avos/dias para placeholders do template (frações de 13º/férias e dias de aviso)
+  for (const c of calculos || []) {
+    if (c.item === '13º proporcional') {
+      const m = /(\d+)\/12/.exec(c.memoria || '');
+      if (m) { dados.AVOS_13 = m[1]; dados.AVOS_13_FRACAO = `${m[1]}/12`; }
+    }
+    if (c.item === 'Férias proporcionais + 1/3') {
+      const m = /(\d+)\/12/.exec(c.memoria || '');
+      if (m) { dados.AVOS_FERIAS = m[1]; dados.AVOS_FERIAS_FRACAO = `${m[1]}/12`; }
+    }
+    if (c.item === 'Aviso prévio indenizado') {
+      const m = /(\d+)\s*dias/.exec(c.memoria || '');
+      if (m) dados.DIAS_AVISO_PREVIO = m[1];
+    }
+  }
+
   // 2) CNPJ oficial (BrasilAPI)
   const receita = (cnpj) => (dadosReceita || []).find((d) => d && !d.erro && soDigitos(d.cnpj) === soDigitos(cnpj));
   const r1 = receita(caso.recl1_cnpj);
   const r2 = receita(caso.recl2_cnpj);
 
   // 3) Competência
-  const local = localPrestacao(dadosCep);
+  const local = localPrestacao(caso, dadosCep);
   dados.VARA_CIDADE_REGIAO = montarVaraCidadeRegiao(caso, local) || '[VARA / CIDADE / REGIÃO]';
   dados.LOCAL_PRESTACAO_ENDERECO = caso.local_prestacao || caso.recl1_logradouro || (r1 && r1.endereco) || '[LOCAL DE PRESTAÇÃO]';
   dados.RITO = attrs.rito === 'sumarissimo' ? 'sumaríssimo' : 'ordinário';
@@ -180,10 +192,13 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.RECL_ENDERECO = caso.recl_endereco || '[ENDEREÇO DO RECLAMANTE]';
 
   // 5) Reclamadas
-  dados.RECLAMADA1_RAZAO = (r1 && r1.razao_social) || caso.recl1_nome || '[RAZÃO SOCIAL 1ª RECLAMADA]';
+  // Nome da reclamada vem da ENTREVISTA (fonte primária); o CNPJ oficial só
+  // confirma endereço e número. Nunca substituir o nome informado pelo cliente
+  // por uma razão social retornada pela Receita (pode ser entidade diversa).
+  dados.RECLAMADA1_RAZAO = caso.recl1_nome || (r1 && r1.razao_social) || '[RAZÃO SOCIAL 1ª RECLAMADA]';
   dados.RECLAMADA1_CNPJ = (r1 && r1.cnpj) || caso.recl1_cnpj || '[CNPJ - confirmar]';
   dados.RECLAMADA1_ENDERECO = (r1 && r1.endereco) || caso.recl1_logradouro || '[ENDEREÇO - confirmar]';
-  dados.RECLAMADA2_RAZAO = (r2 && r2.razao_social) || caso.recl2_nome || '';
+  dados.RECLAMADA2_RAZAO = caso.recl2_nome || (r2 && r2.razao_social) || '';
   dados.RECLAMADA2_CNPJ = (r2 && r2.cnpj) || caso.recl2_cnpj || '';
   dados.RECLAMADA2_ENDERECO = (r2 && r2.endereco) || '';
 
@@ -222,13 +237,9 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.CCT_CLAUSULAS = caso.cct_clausulas || '';
   dados.CCT_CLAUSULA_MULTA = caso.cct_clausula_multa || '';
 
-  // 11) Verbas rescisórias — períodos. O período CALCULADO (avosEntreDatas, em
-  // mathUtils.js) tem prioridade sobre o texto livre da entrevista/IA, pois é o
-  // mesmo número de avos usado para computar VALOR_FERIAS/VALOR_13 — evita a
-  // peça pedir, por exemplo, "11/12" no corpo do texto mas um valor em R$
-  // equivalente a um número de avos diferente.
-  dados.PERIODO_FERIAS_PROP = periodosCalculados.PERIODO_FERIAS_PROP || caso.periodo_ferias_prop || '';
-  dados.PERIODO_13 = periodosCalculados.PERIODO_13 || caso.periodo_13 || '';
+  // 11) Verbas rescisórias — períodos
+  dados.PERIODO_FERIAS_PROP = caso.periodo_ferias_prop || '';
+  dados.PERIODO_13 = caso.periodo_13 || '';
   dados.PERIODO_FERIAS_VENCIDAS = caso.periodo_ferias_vencidas || '';
 
   // 12) Data da peça
@@ -246,7 +257,12 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.tem_capitulo_rescisao = ['rescisao_indireta', 'nulidade_pedido_demissao', 'reversao_justa_causa'].includes(tipo);
   dados.aviso_reversao = tipo === 'rescisao_indireta' || tipo === 'reversao_justa_causa';
   dados.aviso_normal = tipo === 'sem_justa_causa' || tipo === 'nulidade_pedido_demissao';
-  dados.acumulo_funcao = flag(caso.tem_acumulo);
+  // Acúmulo só ativa com atividades PRÓPRIAS descritas; se coincide com o desvio
+  // (mesmos fatos de Prevenção de Perdas), fica só desvio — evita bis in idem.
+  const mesmoFatoDesvio =
+    caso.tem_desvio && caso.acumulo_atividades && caso.desvio_atividades &&
+    String(caso.acumulo_atividades).toLowerCase() === String(caso.desvio_atividades).toLowerCase();
+  dados.acumulo_funcao = flag(caso.tem_acumulo && caso.acumulo_atividades && !mesmoFatoDesvio);
   dados.desvio_funcao = flag(caso.tem_desvio);
   dados.gratificacao_funcao = flag(caso.tem_gratificacao);
   dados.escala_12x36 = /12\s*x\s*36/i.test(escalaTxt);

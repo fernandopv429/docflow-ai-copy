@@ -100,6 +100,11 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
   if (preenchidosDet > 0 && Object.keys(caso).length <= 2) {
     notify(`IA não extraiu dados estruturados — preenchido por extração determinística (${preenchidosDet} campos).`);
   }
+  // Corrige série: se a IA confundiu série com o número da CTPS (mesmo valor),
+  // usa a série extraída por regex — evita [SÉRIE] na minuta final.
+  if (caso.recl_ctps && caso.recl_serie && caso.recl_serie === caso.recl_ctps && casoDet.recl_serie) {
+    caso.recl_serie = casoDet.recl_serie;
+  }
 
   // Merge dos atributos já extraídos no chat (conversarEntrevista) como fallback.
   // Garante que função, CNPJ, CEP, comarca e local de prestação cheguem ao template
