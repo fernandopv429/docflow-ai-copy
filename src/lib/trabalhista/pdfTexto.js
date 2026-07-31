@@ -5,9 +5,9 @@
 // visão quando o texto é extraível (formulário digitado).
 // ============================================================
 import * as pdfjsLib from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import PdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?worker';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+pdfjsLib.GlobalWorkerOptions.workerPort = new PdfWorker();
 
 const ehPdf = (u) => /\.pdf(\?[^/]*)?$/i.test(String(u));
 
