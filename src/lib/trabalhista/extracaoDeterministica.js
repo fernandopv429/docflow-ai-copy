@@ -150,13 +150,17 @@ export function extrairDeterministico(texto) {
     const desvio = matchAny(t, /desvio\s*DE\s*FUN[ÇC][ÃA]O[:\s]*\n?(.+?)(?:\n\n|DANO\s|MORAL|$)/i);
     if (desvio) caso.desvio_atividades = desvio.trim();
   }
-  // Acúmulo (Prevenção de perdas)
-  if (/ac[úu]mulo|preven[çc][ãa]o\s*de\s*perdas/i.test(t)) {
+  // Acúmulo de função — só ativa quando a entrevista menciona "acúmulo" explicitamente
+  // e como fato DISTINTO do desvio de função. "Prevenção de perdas" já é capturada acima
+  // como desvio_atividades; incluí-la também aqui disparava tem_acumulo=true para o MESMO
+  // fato, mas sem preencher acumulo_atividades (bloqueado pelo `if (!caso.desvio_atividades)`
+  // logo abaixo), gerando uma tese "DO ACÚMULO DE FUNÇÃO" na minuta com o campo de atividades
+  // em branco ("atividades de ,") e um pedido de multa de 20% duplicado sobre o mesmo fato
+  // já coberto pela multa de 50% do desvio de função.
+  if (/ac[úu]mulo\s*de\s*fun[çc][ãa]o/i.test(t) && !caso.desvio_atividades) {
     caso.tem_acumulo = true;
-    if (!caso.desvio_atividades) {
-      const ac = matchAny(t, /(?:ac[úu]mulo|desvio)\s*(?:DE\s*FUN[ÇC][ÃA]O)?[:\s]*\n?(.+?)(?:\n\n|DANO\s|MORAL|$)/i);
-      if (ac) caso.acumulo_atividades = ac.trim();
-    }
+    const ac = matchAny(t, /ac[úu]mulo\s*(?:DE\s*FUN[ÇC][ÃA]O)?[:\s]*\n?(.+?)(?:\n\n|DANO\s|MORAL|$)/i);
+    if (ac) caso.acumulo_atividades = ac.trim();
   }
 
   // Tipo de dispensa
