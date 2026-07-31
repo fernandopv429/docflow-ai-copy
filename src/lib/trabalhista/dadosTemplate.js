@@ -222,9 +222,13 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.CCT_CLAUSULAS = caso.cct_clausulas || '';
   dados.CCT_CLAUSULA_MULTA = caso.cct_clausula_multa || '';
 
-  // 11) Verbas rescisórias — períodos
-  dados.PERIODO_FERIAS_PROP = caso.periodo_ferias_prop || '';
-  dados.PERIODO_13 = caso.periodo_13 || '';
+  // 11) Verbas rescisórias — períodos. O período CALCULADO (avosEntreDatas, em
+  // mathUtils.js) tem prioridade sobre o texto livre da entrevista/IA, pois é o
+  // mesmo número de avos usado para computar VALOR_FERIAS/VALOR_13 — evita a
+  // peça pedir, por exemplo, "11/12" no corpo do texto mas um valor em R$
+  // equivalente a um número de avos diferente.
+  dados.PERIODO_FERIAS_PROP = periodosCalculados.PERIODO_FERIAS_PROP || caso.periodo_ferias_prop || '';
+  dados.PERIODO_13 = periodosCalculados.PERIODO_13 || caso.periodo_13 || '';
   dados.PERIODO_FERIAS_VENCIDAS = caso.periodo_ferias_vencidas || '';
 
   // 12) Data da peça
