@@ -1,5 +1,6 @@
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import mammoth from 'mammoth';
+import { sanitizarTextoEntrevista } from './pdfSanitizer';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { extrairDeterministico } from './extracaoDeterministica';
 import { calcularVerbasCaso } from './mathUtils';
@@ -55,7 +56,8 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
   const textoDocx = await extrairTextoDocxs(urls).catch(() => '');
   const urlsDocx = new Set((fileUrls || []).filter((u) => /\.docx(\?[^/]*)?$/i.test(String(u))));
   const urlsVisao = urls.filter((u) => !urlsDocx.has(u));
-  const textoParaExtracao = [texto || '', textoDocx].filter(Boolean).join('\n\n');
+  // Sanitiza texto da entrevista (remove rodapés ZapSign, hashes, IPs etc.)
+  const textoParaExtracao = sanitizarTextoEntrevista([texto || '', textoDocx].filter(Boolean).join('\n\n'));
   const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(textoParaExtracao), ...((attrs && attrs.cnpjs) || [])] : [];
   const ceps = config.cep_ativo ? [...extrairCeps(textoParaExtracao), ...((attrs && attrs.ceps) || [])] : [];
   const cnpjsUnicos = [...new Set(cnpjs.map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14))];
