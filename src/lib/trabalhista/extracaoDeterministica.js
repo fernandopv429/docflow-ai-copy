@@ -55,17 +55,20 @@ export function extrairDeterministico(texto) {
   if (cpfMatch) caso.recl_cpf = limparDigitos(cpfMatch[1]);
 
   // RG
-  const rg = matchAny(t, /RG[:\s]*n[ºo]?\s*(\d+)/i);
+  const rg = matchAny(t, /RG[:\s]*(?:n[ºo]?\.?\s*)?(\d+)/i);
   if (rg) caso.recl_rg = limparDigitos(rg);
 
   // PIS
-  const pis = matchAny(t, /PIS[:\s]*n[ºo]?\s*([\d.-]+)/i);
+  const pis = matchAny(t, /PIS[:\s]*(?:n[ºo]?\.?\s*)?([\d.-]+)/i);
   if (pis) caso.recl_pis = limparDigitos(pis);
 
   // CTPS e Série (separados)
-  const ctps = matchAny(t, /CTPS[:\s]*n[ºo]?\s*(\d+)/i);
+  const ctps = matchAny(t, /CTPS[:\s]*(?:n[ºo]?\.?\s*)?(\d+)/i);
   if (ctps) caso.recl_ctps = limparDigitos(ctps);
-  const serie = matchAny(t, /serie[:\s]*n[ºo]?\s*(\d+)/i);
+  // "n[ºo]?" opcional: entrevistas costumam escrever "serie: 25795" sem o "nº",
+  // e a versão anterior desta regex exigia o "n" literal — nunca casava nesse formato
+  // e o RECL_SERIE saía como "[SÉRIE]" (colchete não preenchido) na minuta final.
+  const serie = matchAny(t, /s[ée]rie[:\s]*(?:n[ºo]?\.?\s*)?(\d+)/i);
   if (serie) caso.recl_serie = limparDigitos(serie);
 
   // Nascimento
