@@ -1,6 +1,7 @@
 import { runtimeCacheKey, withRuntimeCache } from './runtimeCache';
 import mammoth from 'mammoth';
 import { sanitizarTextoEntrevista } from './pdfSanitizer';
+import { extrairTextoPdfs } from './pdfTexto';
 import { extrairCasoDeTexto } from './parserEntrevista';
 import { extrairDeterministico } from './extracaoDeterministica';
 import { calcularVerbasCaso } from './mathUtils';
@@ -52,12 +53,15 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
   };
   const config = await carregarConfigIntegracoes();
   const urls = [...(fileUrls || [])];
-  // DOCX → texto extraído (IA não lê por visão); PDF/imagem → passam por visão
+  // DOCX/PDF-texto → extraídos por código (sem IA); PDF escaneado/imagem → visão da IA
   const textoDocx = await extrairTextoDocxs(urls).catch(() => '');
+  const { texto: textoPdf, pdfsComTexto } = await extrairTextoPdfs(urls).catch(() => ({ texto: '', pdfsComTexto: new Set() }));
+  if (pdfsComTexto.size) notify(`Texto extraído de ${pdfsComTexto.size} PDF(s) sem IA (campos estruturados)...`);
   const urlsDocx = new Set((fileUrls || []).filter((u) => /\.docx(\?[^/]*)?$/i.test(String(u))));
-  const urlsVisao = urls.filter((u) => !urlsDocx.has(u));
+  // Visão da IA só para PDFs SEM texto (escaneados/manuscritos) e imagens
+  const urlsVisao = urls.filter((u) => !urlsDocx.has(u) && !pdfsComTexto.has(u));
   // Sanitiza texto da entrevista (remove rodapés ZapSign, hashes, IPs etc.)
-  const textoParaExtracao = sanitizarTextoEntrevista([texto || '', textoDocx].filter(Boolean).join('\n\n'));
+  const textoParaExtracao = sanitizarTextoEntrevista([texto || '', textoDocx, textoPdf].filter(Boolean).join('\n\n'));
   const cnpjs = config.cnpj_ativo ? [...extrairCnpjs(textoParaExtracao), ...((attrs && attrs.cnpjs) || [])] : [];
   const ceps = config.cep_ativo ? [...extrairCeps(textoParaExtracao), ...((attrs && attrs.ceps) || [])] : [];
   const cnpjsUnicos = [...new Set(cnpjs.map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14))];
@@ -75,7 +79,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
     temMaterial
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 3, texto: textoParaExtracao || '', fileUrls: urlsVisao }), () => extrairCasoDeTexto(textoParaExtracao || '', urlsVisao), {
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 4, texto: textoParaExtracao || '', fileUrls: urlsVisao }), () => extrairCasoDeTexto(textoParaExtracao || '', urlsVisao), {
           onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
         }).catch(() => ({ caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Falha na extração estruturada.' }] }))
       : Promise.resolve({ caso: {}, alertas: [] }),
