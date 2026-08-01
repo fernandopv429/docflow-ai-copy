@@ -322,7 +322,7 @@ PERICULOSIDADE:
 - Só omita se o texto EXPLICITAR que não é da categoria vigilância.
 
 ESCALA 4X2/6X2 (jornada NÃO 12x36):
-- Se a escala informada NÃO for 12x36 (ex.: "4x2", "6x2", "6x1" com labor habitual em dia de folga) → preencha `escala` com o texto exato informado (ex.: "4x2"); a seção de descaracterização correspondente é ativada automaticamente pelo código a partir desse texto, não precisa de flag própria aqui.
+- Se a escala informada NÃO for 12x36 (ex.: "4x2", "6x2", "6x1" com labor habitual em dia de folga) → preencha o campo "escala" com o texto exato informado (ex.: "4x2"); a seção de descaracterização correspondente é ativada automaticamente pelo código a partir desse texto, não precisa de flag própria aqui.
 
 DOENÇA OCUPACIONAL / ESTABILIDADE / PENSÃO (seção 13 "Saúde" do formulário — doença/insalubridade/periculosidade/EPI):
 - Se a entrevista relatar QUALQUER doença, lesão, LER/DORT, problema de coluna, perda auditiva, intoxicação ou acidente de trabalho relacionado à função exercida → tem_doenca = true e doenca_descricao = descrição objetiva da doença/lesão e de como se relaciona ao trabalho (2-3 frases).
