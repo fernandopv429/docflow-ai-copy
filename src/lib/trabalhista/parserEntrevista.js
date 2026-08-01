@@ -321,6 +321,15 @@ PERICULOSIDADE:
 - Vigilante → tem_periculosidade = true POR PADRÃO (Lei 7.102/83 + Portaria MTE 1885/2013 — categoria profissional de vigilância tem adicional de periculosidade mesmo sem armamento pessoal quando guarda patrimônio).
 - Só omita se o texto EXPLICITAR que não é da categoria vigilância.
 
+ESCALA 4X2/6X2 (jornada NÃO 12x36):
+- Se a escala informada NÃO for 12x36 (ex.: "4x2", "6x2", "6x1" com labor habitual em dia de folga) → preencha `escala` com o texto exato informado (ex.: "4x2"); a seção de descaracterização correspondente é ativada automaticamente pelo código a partir desse texto, não precisa de flag própria aqui.
+
+DOENÇA OCUPACIONAL / ESTABILIDADE / PENSÃO (seção 13 "Saúde" do formulário — doença/insalubridade/periculosidade/EPI):
+- Se a entrevista relatar QUALQUER doença, lesão, LER/DORT, problema de coluna, perda auditiva, intoxicação ou acidente de trabalho relacionado à função exercida → tem_doenca = true e doenca_descricao = descrição objetiva da doença/lesão e de como se relaciona ao trabalho (2-3 frases).
+- Se a doença/acidente foi comunicada à empresa e/ou gerou afastamento pelo INSS (auxílio-doença acidentário, espécie B91) e a dispensa ocorreu no período de estabilidade (12 meses após a cessação do benefício) ou sem observância dela → tem_estabilidade = true. NÃO marque se a doença não teve relação ocupacional demonstrável ou se não houve afastamento previdenciário indicado.
+- Se houver relato de sequela, redução de capacidade laborativa ou incapacidade (ainda que parcial) decorrente da doença/acidente ocupacional → tem_pensao = true. NÃO marque apenas por haver doença sem indício de redução de capacidade — pensão vitalícia exige dano permanente, não simples afastamento temporário.
+- Essas 3 flags (tem_doenca, tem_estabilidade, tem_pensao) SEMPRE dependem de doenca_descricao preenchida — nunca as marque true com o campo vazio.
+
 DESCONTO INDEVIDO DE CONSIGNADO:
 - "desconto integral do saldo devedor do empréstimo consignado na rescisão" → fatos_narrados deve incluir esse fato; dano_fatos deve mencionar.
 - NUNCA omita esse fato dos fatos_narrados.
