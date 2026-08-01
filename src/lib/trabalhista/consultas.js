@@ -146,14 +146,23 @@ export function categoriaCct(caso = {}, attrs = {}) {
   return 'terceirizados'; // porteiro / controlador de acesso / SINDEEPRES (padrão)
 }
 
-export async function consultarCct({ pergunta, categoria, data_fato, limite = 4 }) {
+export async function consultarCct({ pergunta, categoria, municipio, data_fato, limite = 4 }) {
   try {
-    const resp = await base44.functions.invoke('cct', { pergunta, categoria, data_fato, limite });
+    const resp = await base44.functions.invoke('cct', { pergunta, categoria, municipio, data_fato, limite });
     const data = resp?.data ?? resp;
     return { pergunta, resultados: Array.isArray(data?.resultados) ? data.resultados : [], erro: data?.erro };
   } catch (e) {
     return { pergunta, resultados: [], erro: 'indisponível' };
   }
+}
+
+// Município onde o reclamante prestava serviços — define a base territorial
+// da CCT. Extraído do endereço de prestação (formato BR: "..., Cidade - UF, CEP").
+function municipioDeLocal(local) {
+  if (!local) return '';
+  const s = String(local).replace(/\d{5}-?\d{3}/g, '').trim();
+  const m = s.match(/([A-ZÀ-Ý][A-ZÀ-Ý\s'.-]*?)\s*-\s*([A-Z]{2})\b/i);
+  return m ? m[1].trim().replace(/[.,;]+$/, '') : '';
 }
 
 // Perguntas padrão para reunir as cláusulas mais usadas na peça.
@@ -167,11 +176,12 @@ const CCT_PERGUNTAS = [
 export async function enriquecerCct(caso, attrs, config) {
   if (!config?.cct_ativo) return null;
   const categoria = config.cct_categoria || categoriaCct(caso, attrs);
+  const municipio = municipioDeLocal(caso?.local_prestacao) || caso?.comarca || '';
   const data_fato = caso?.data_rescisao || caso?.data_admissao || undefined;
-  const key = runtimeCacheKey({ categoria, data_fato });
+  const key = runtimeCacheKey({ categoria, municipio, data_fato });
   return withRuntimeCache('cct', key, async () => {
     const buscas = await Promise.all(
-      CCT_PERGUNTAS.map((pergunta) => consultarCct({ pergunta, categoria, data_fato, limite: 3 }))
+      CCT_PERGUNTAS.map((pergunta) => consultarCct({ pergunta, categoria, municipio, data_fato, limite: 3 }))
     );
     // dedup por cláusula (clausula_ref + título da CCT)
     const vistos = new Set();
