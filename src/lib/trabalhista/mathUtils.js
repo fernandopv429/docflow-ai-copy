@@ -286,8 +286,18 @@ export function calcularVerbasCaso(caso = {}) {
     });
   }
 
-  // Dano moral (10x a maior remuneração na função)
-  if (caso.tem_dano_moral && maiorRem) {
+  // Dano moral (10x a maior remuneração na função).
+  // A flag tem_dano_moral pode ser desativada pelo validador do parser
+  // (dano_fatos vazio/curto), mas a narrativa do dano moral é sempre gerada
+  // no template (sem condicional). Dispara o cálculo também quando há
+  // conteúdo de dano moral (fatos/supervisor) ou teses que o fundamentam.
+  const temConteudoDanoMoral = caso.tem_dano_moral
+    || (caso.dano_fatos && String(caso.dano_fatos).trim().length >= 20)
+    || (caso.dano_supervisor && String(caso.dano_supervisor).trim().length >= 20)
+    || caso.tem_desvio
+    || (caso.tem_ft && caso.tem_integracao_por_fora)
+    || caso.tem_insalubridade;
+  if (temConteudoDanoMoral && maiorRem) {
     itens.push({ item: 'Dano moral (10x remuneração)', memoria: '10x a maior remuneração na função', valor: danoMoral10x(maiorRem) });
   }
 
