@@ -193,6 +193,30 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     emailPreambuloAdicionado = true;
   }
 
+  // 12) ROL DE PEDIDOS — remove os valores UNITÁRIOS informativos (entre
+  // parênteses) que aparecem ao lado do TOTAL e estavam sendo somados
+  // manualmente, inflando o rol em relação ao fecho (valor da causa
+  // determinístico). Agora cada linha mostra só o valor total do pedido.
+  // (Tags em <w:t> único no template — replace literal seguro.)
+  let rolValoresUnitariosRemovidos = false;
+  const ROL_UNITARIOS = [
+    '({{VALOR_POR_FORA}}) ',
+    '({{VALOR_AUX_ALIMENTACAO}}/dia) ',
+    '({{ASSIDUIDADE_DIFERENCA}}/mês) ',
+  ];
+  for (const frag of ROL_UNITARIOS) {
+    if (xml.includes(frag)) { xml = xml.split(frag).join(''); rolValoresUnitariosRemovidos = true; }
+  }
+
+  // 13) HONORÁRIOS — substitui o valor hardcodeado "R$ 10.012,79" (relicto
+  // do modelo original) pela tag dinâmica {{VALOR_CAUSA_TOTAL}}. O "R$" e o
+  // número podem estar em runs separados, por isso o replace é tag-tolerant.
+  let honorariosCorrigido = false;
+  if (xml.includes('10.012,79')) {
+    xml = _substituirFraseTagTolerant(xml, 'R$ 10.012,79', '{{VALOR_CAUSA_TOTAL}}');
+    honorariosCorrigido = true;
+  }
+
   zip.file('word/document.xml', xml);
   const blob = zip.generate({
     type: 'blob',
@@ -216,5 +240,7 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     salariosAbertoAdicionado: !jaTemSalarios,
     autorCorrigido,
     emailPreambuloAdicionado,
+    rolValoresUnitariosRemovidos,
+    honorariosCorrigido,
   };
 }

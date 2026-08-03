@@ -182,7 +182,11 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
     if (c.valor == null) continue;
     const campo = CALC_CAMPO[c.item];
     if (campo) dados[campo] = formatBRL(c.valor);
-    somaCausa += Number(c.valor) || 0;
+    // Honorários são calculados À PARTE (15% sobre o valor da causa, art. 85
+    // CPC) — padrão do escritório. Não compõem o valor da causa (o rol de
+    // pedidos não os lista como valor), senão o fecho fica maior que a soma
+    // do rol. VALOR_HONORARIOS continua disponível para o tópico de honorários.
+    if (c.item !== 'Honorários advocatícios (15%)') somaCausa += Number(c.valor) || 0;
   }
   const valorCausa = brlComExtenso(round2(somaCausa));
   dados.VALOR_CAUSA_TOTAL = valorCausa;

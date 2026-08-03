@@ -73,6 +73,8 @@ export default function ModelosReferencia() {
         r.salariosAbertoAdicionado && 'salários em aberto',
         r.autorCorrigido && 'gênero (o autor → o reclamante)',
         r.emailPreambuloAdicionado && 'e-mail no preâmbulo',
+        r.rolValoresUnitariosRemovidos && 'rol sem valores unitários',
+        r.honorariosCorrigido && 'R$ 10.012,79 → tag dinâmica',
       ].filter(Boolean);
       setMsg(`Template corrigido baixado${itens.length ? ` (adicionado: ${itens.join(', ')})` : ' — já estava atualizado'}. Envie-o em “Trocar template” para torná-lo oficial.`);
     } catch (err) {
