@@ -88,11 +88,11 @@ const MODO_RESCISAO = {
 };
 
 const MOTIVO_SAIDA = {
-  sem_justa_causa: 'foi dispensado sem justa causa',
-  rescisao_indireta: 'requereu a rescisão indireta do contrato',
-  nulidade_pedido_demissao: 'foi coagido e ameaçado a pedir demissão',
-  reversao_justa_causa: 'foi dispensado por justa causa',
-  acordo: 'encerrou o contrato por acordo',
+  sem_justa_causa: 'sido dispensado sem justa causa',
+  rescisao_indireta: 'requerido a rescisão indireta do contrato',
+  nulidade_pedido_demissao: 'sido coagido e ameaçado a pedir demissão',
+  reversao_justa_causa: 'sido dispensado por justa causa',
+  acordo: 'encerrado o contrato por acordo',
 };
 
 const flag = (v) => !!v;

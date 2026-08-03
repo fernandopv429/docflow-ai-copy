@@ -132,7 +132,7 @@ export function extrairDeterministico(texto) {
   if (res) caso.data_rescisao = paraIsoData(res);
 
   // Salário
-  const sal = matchAny(t, /Sal[áa]rio[:\s]*([\d.,]+)/i);
+  const sal = matchAny(t, /Sal[áa]rio[:\s]*(?:R\$\s*)?([\d.,]+)/i);
   if (sal) {
     const n = comoNumero(sal);
     if (n != null) caso.salario = n;

@@ -113,11 +113,26 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
     caso.recl_serie = casoDet.recl_serie;
   }
 
+  // Saneamento pós-extração: corrige valores claramente errados da IA e
+  // impede que texto bruto da entrevista vaze em campos estruturados do
+  // template (ex.: "FUNÇÃO: AUXILIAR..." dentro de jornada_horario).
+  const ESTADOS_CIVIS = /^(solteir[oa]|casad[oa]?|divorciad[oa]|separad[oa]|vi[úu]v[oa]?|un[ií]ão\s+est[áa]vel)$/i;
+  if (caso.funcao && ESTADOS_CIVIS.test(caso.funcao.trim())) {
+    caso.funcao = casoDet.funcao || '';
+  }
+  const MARC_ENTREVISTA = /\b(?:FUN[ÇC][ÃA]O|DANO\s+MORAL|DIREITOS\s+LESADOS|JORNADA|SAL[ÁA]RIO|ADMISS[ÃA]O|RESCIS[ÃA]O|CEP|CNPJ|ENDERE[ÇC]O|ESTADO\s+CIVIL|TEMPO\s+LABORADO|DESvio|AC[ÚU]MULO|FOLGAS)\s*[:/]/i;
+  for (const campo of ['jornada_horario', 'dano_fatos', 'desvio_atividades', 'acumulo_atividades', 'local_prestacao', 'recl_endereco', 'funcao', 'escala']) {
+    if (caso[campo] && MARC_ENTREVISTA.test(String(caso[campo]))) {
+      const det = casoDet[campo];
+      caso[campo] = (det && !MARC_ENTREVISTA.test(String(det))) ? det : '';
+    }
+  }
+
   // Merge dos atributos já extraídos no chat (conversarEntrevista) como fallback.
   // Garante que função, CNPJ, CEP, comarca e local de prestação cheguem ao template
   // mesmo quando o parser estruturado não os extraiu (ex.: PDF não lido pela IA).
   const attrsObj = attrs || {};
-  if (!caso.funcao && attrsObj.funcao) caso.funcao = attrsObj.funcao;
+  if (!caso.funcao && attrsObj.funcao && !ESTADOS_CIVIS.test(attrsObj.funcao.trim())) caso.funcao = attrsObj.funcao;
   if (!caso.tipo_dispensa && attrsObj.tipo_dispensa) caso.tipo_dispensa = attrsObj.tipo_dispensa;
   if (!caso.comarca_uf && attrsObj.comarca_uf) caso.comarca_uf = attrsObj.comarca_uf;
   if (!caso.local_prestacao && attrsObj.local_prestacao) caso.local_prestacao = attrsObj.local_prestacao;
