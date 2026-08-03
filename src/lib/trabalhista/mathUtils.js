@@ -104,13 +104,20 @@ export function anosCompletos(admissao, rescisao) {
   return m == null ? null : Math.floor(m / 12);
 }
 
-// Projeta a data de rescisão pelo aviso prévio indenizado (Lei 12.506/2011).
-// 13º e férias proporcionais usam essa data projetada para contar os avos.
-export function dataRescisaoProjetada(admissao, rescisao, anos) {
-  if (!rescisao) return null;
-  const diasAviso = anos != null ? Math.min(30 + anos * 3, 90) : 30;
+// Projeta a data de rescisão pelos dias do aviso prévio INDENIZADO. O aviso
+// prévio (trabalhado ou indenizado) integra o tempo de serviço do empregado
+// para todos os efeitos legais (art. 487, §1º, da CLT; Súmula 371 do C. TST),
+// de modo que 13º, férias proporcionais e FGTS do período devem ser apurados
+// já computando esses dias adicionais — NÃO apenas a data "seca" da rescisão.
+// (Isso NÃO altera os próprios dias do aviso prévio, que continuam calculados
+// sobre os anos completos até a data real de rescisão.)
+// Recebe os DIAS efetivamente indenizados (ap.dias) — na rescisão por acordo
+// (art. 484-A, I, CLT) o aviso é pago pela metade, e a projeção deve usar essa
+// metade para não superestimar 13º/férias/FGTS.
+export function projetarDataComAvisoPrevio(rescisao, diasAviso) {
+  if (!rescisao || !diasAviso) return rescisao;
   const r = new Date(rescisao);
-  if (isNaN(r.getTime())) return null;
+  if (isNaN(r.getTime())) return rescisao;
   r.setDate(r.getDate() + diasAviso);
   return r.toISOString().slice(0, 10);
 }
@@ -227,8 +234,10 @@ export function calcularVerbasCaso(caso = {}) {
       : `${ap.dias} dias (Lei 12.506/2011)`;
     itens.push({ item: 'Aviso prévio indenizado', memoria: memoriaAp, valor: ap.valor });
   }
-  const rescisaoProjetada = dataRescisaoProjetada(caso.data_admissao, caso.data_rescisao, anos);
-  const dataFim = rescisaoProjetada || caso.data_rescisao;
+  // Projeção do aviso prévio: usa os DIAS efetivamente indenizados (ap.dias),
+  // que no acordo é a METADE — garante que 13º/férias/FGTS não sejam
+  // superestimados na rescisão por acordo (art. 484-A, I, CLT).
+  const dataFim = ap ? (projetarDataComAvisoPrevio(caso.data_rescisao, ap.dias) || caso.data_rescisao) : caso.data_rescisao;
   // Meses COM a projeção do aviso — usados no FGTS (Súm. 305/371 TST: o aviso
   // prévio indenizado integra o tempo de serviço, inclusive para FGTS).
   const mesesProjetados = mesesContrato(caso.data_admissao, dataFim) ?? meses;
