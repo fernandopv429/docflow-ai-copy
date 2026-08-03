@@ -12,10 +12,13 @@ import { formatBRL, round2, brlComExtenso } from './mathUtils';
 // Rótulo do item calculado (mathUtils) -> campo {{VALOR_*}} do template
 const CALC_CAMPO = {
   'Aviso prévio indenizado': 'VALOR_AVISO_PREVIO',
+  'Saldo de salário': 'VALOR_SALDO_SALARIO',
+  'Multa do art. 467 da CLT': 'VALOR_MULTA_467',
   '13º proporcional': 'VALOR_13',
   'Férias proporcionais + 1/3': 'VALOR_FERIAS',
   'FGTS do período (8%)': 'VALOR_FGTS',
   'Multa de 40% do FGTS': 'VALOR_MULTA_40',
+  'Multa de 20% do FGTS (acordo)': 'VALOR_MULTA_40',
   'Dano moral (10x remuneração)': 'VALOR_DANO_MORAL_10X',
   'Folgas trabalhadas (100%)': 'VALOR_FT',
   'Reflexo DSR sobre FT (1/6)': 'VALOR_DSR',
@@ -44,6 +47,7 @@ export const CAMPOS_TEMPLATE = [
   'DOENCA_DESCRICAO', 'VALOR_POR_FORA', 'VALOR_AUX_ALIMENTACAO',
   'CCT_ANO', 'CCT_CLAUSULAS', 'CCT_CLAUSULA_MULTA',
   'PERIODO_FERIAS_PROP', 'PERIODO_13', 'PERIODO_FERIAS_VENCIDAS',
+  'VALOR_SALDO_SALARIO', 'VALOR_MULTA_467',
   'VALOR_AVISO_PREVIO', 'VALOR_13', 'VALOR_FERIAS', 'VALOR_FGTS', 'VALOR_MULTA_40',
   'VALOR_FT', 'VALOR_DSR', 'VALOR_DANO_MORAL_10X', 'VALOR_CAUSA_TOTAL', 'DATA_PECA',
 ];
