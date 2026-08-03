@@ -31,6 +31,12 @@ const GENERO_FEM = [
   [/\bcontratado\b/g, 'contratada'],
   [/\bprejudicado\b/g, 'prejudicado(a)'],
   [/\bregistrado\b/g, 'registrada'],
+  [/\bbrasileiro\b/g, 'brasileira'],
+  [/\bcasado\b/g, 'casada'],
+  [/\bsolteiro\b/g, 'solteira'],
+  [/\bdivorciado\b/g, 'divorciada'],
+  [/\bviúvo\b/g, 'viúva'],
+  [/\bseparado\b/g, 'separada'],
 ];
 
 function aplicarGenero(zip) {
@@ -47,10 +53,48 @@ function aplicarGenero(zip) {
 // homem, masculiniza SÓ os termos que se referem inequivocamente ao autor/
 // obreiro (frase a frase, seguro — nunca toca em "reclamada", que é a empresa).
 const FRASES_MASC = [
+  // Qualificação (template-mestre veio no feminino — masculiniza o reclamante)
+  ['brasileira,', 'brasileiro,'],
+  ['casada,', 'casado,'],
+  ['solteira,', 'solteiro,'],
+  ['divorciada,', 'divorciado,'],
+  ['viúva,', 'viúvo,'],
+  ['separada judicialmente,', 'separado judicialmente,'],
+  ['portadora do RG', 'portador do RG'],
+  ['portadora do CPF', 'portador do CPF'],
+  ['filha de', 'filho de'],
+  ['nascida em', 'nascido em'],
+  ['residente e domiciliada', 'residente e domiciliado'],
+  ['domiciliada na', 'domiciliado na'],
+  // CPF (NUNCA CNPJ — "inscrita no CNPJ" refere-se à empresa e NÃO é tocado)
+  ['e inscrita no CPF', 'e inscrito no CPF'],
+  ['inscrita no CPF', 'inscrito no CPF'],
+  // Contrato / rescisão
+  ['admitida pela', 'admitido pela'],
+  ['admitida em', 'admitido em'],
   ['ter sido contratada pela', 'ter sido contratado pela'],
   ['ter sido contratada', 'ter sido contratado'],
+  ['contratada pela', 'contratado pela'],
+  ['foi a mesma dispensada', 'foi o mesmo dispensado'],
+  ['a mesma dispensada', 'o mesmo dispensado'],
+  ['dispensada sem justa causa', 'dispensado sem justa causa'],
+  ['dispensada do', 'dispensado do'],
+  ['coagida a', 'coagido a'],
+  ['ameaçada de', 'ameaçado de'],
+  ['compelida a', 'compelido a'],
+  ['submetida a', 'submetido a'],
   ['foi prejudicada de forma', 'foi prejudicado de forma'],
   ['foi prejudicada', 'foi prejudicado'],
+  ['registrada na', 'registrado na'],
+  // Artigo + reclamante/obreiro (a empresa é "reclamada" — nunca tocada)
+  ['à reclamante', 'ao reclamante'],
+  ['da reclamante', 'do reclamante'],
+  ['pela reclamante', 'pelo reclamante'],
+  ['a reclamante', 'o reclamante'],
+  ['à obreira', 'ao obreiro'],
+  ['da obreira', 'do obreiro'],
+  ['a obreira', 'o obreiro'],
+  ['obreira', 'obreiro'],
 ];
 function aplicarGeneroMasc(zip) {
   const alvo = 'word/document.xml';

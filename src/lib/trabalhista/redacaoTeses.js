@@ -171,6 +171,7 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
     '- REDAÇÃO NATURAL: escreva em parágrafos jurídicos coesos e fluídos, como um advogado experiente em uma petição — NÃO use o padrão rígido "fato → artigo → Súmula → impugnação → pedido" repetido mecanicamente em cada capítulo. Varie a construção das frases, encadeie os argumentos e evite listas/colchetes e linguagem robótica; o texto deve soar natural, não enlatado.',
     '- Mantenha a impugnação da defesa (Súmula 338) e os reflexos quando cabíveis, mas inseridos organicamente no bloco de pedido, não como etapa idêntica obrigatória em todos os capítulos.',
     '- Cada capítulo NÃO deve invadir o tópico de outro. Respeite o escopo indicado em cada um.',
+    '- CONCORDÂNCIA DE GÊNERO: o campo recl_genero indica "M" (masculino) ou "F" (feminino). Escreva TODA a narrativa do capítulo na flexão correta do reclamante — use "reclamante" como substantivo (nunca "autor") e flexione adjetivos e particípios adequadamente (ex.: M → "o reclamante foi admitido/compelido/dispensado/contratado"; F → "a reclamante foi admitida/compelida/dispensada/contratada"). Não troque o gênero de "reclamada" (a empresa).',
     '',
     'DADOS DO CASO:',
     resumoCaso(caso),
