@@ -39,7 +39,7 @@ const TETO_VALOR_CAUSA = 400000;
 export const CAMPOS_TEMPLATE = [
   'VARA_CIDADE_REGIAO', 'RITO',
   'RECL_NOME', 'RECL_NACIONALIDADE', 'RECL_ESTADO_CIVIL', 'RECL_FUNCAO', 'RECL_RG', 'RECL_CPF',
-  'RECL_PIS', 'RECL_CTPS', 'RECL_SERIE', 'RECL_NASCIMENTO', 'RECL_FILIACAO', 'RECL_ENDERECO',
+  'RECL_PIS', 'RECL_CTPS', 'RECL_SERIE', 'RECL_NASCIMENTO', 'RECL_FILIACAO', 'RECL_ENDERECO', 'RECL_EMAIL',
   'RECLAMADA1_RAZAO', 'RECLAMADA1_CNPJ', 'RECLAMADA1_ENDERECO',
   'RECLAMADA2_RAZAO', 'RECLAMADA2_CNPJ', 'RECLAMADA2_ENDERECO',
   'LOCAL_PRESTACAO_ENDERECO', 'DATA_ADMISSAO', 'DATA_RESCISAO', 'SALARIO',
@@ -118,13 +118,22 @@ function cepDoEndereco(end) {
 }
 
 // Competência = local da PRESTAÇÃO DE SERVIÇOS (art. 651 CLT), NÃO a residência
-// do empregado. Usa o CEP do endereço de prestação para achar o município/UF.
+// do empregado. Preferência: endereço da tomadora (recl2_logradouro) > local de
+// prestação informado > endereço da empregadora. Rejeita o endereço residencial.
 function localPrestacao(caso, dadosCep = []) {
-  const cepLocal = cepDoEndereco(caso?.local_prestacao);
-  const v = (dadosCep || []).find(
-    (d) => d && !d.erro && d.municipio && (!cepLocal || String(d.cep || '').replace(/\D/g, '') === cepLocal)
-  );
-  return v ? { municipio: corrigirMunicipio(v.municipio), uf: v.uf } : null;
+  const resid = (caso?.recl_endereco || '').trim();
+  const cand = [caso?.recl2_logradouro, caso?.local_prestacao, caso?.recl1_logradouro]
+    .filter(Boolean)
+    .map((s) => String(s).trim())
+    .filter((s) => s !== resid);
+  for (const end of cand) {
+    const cep = cepDoEndereco(end);
+    const v = (dadosCep || []).find(
+      (d) => d && !d.erro && d.municipio && (!cep || String(d.cep || '').replace(/\D/g, '') === cep)
+    );
+    if (v) return { municipio: corrigirMunicipio(v.municipio), uf: v.uf };
+  }
+  return null;
 }
 
 function montarVaraCidadeRegiao(caso, local) {
@@ -181,7 +190,13 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   // 3) Competência
   const local = localPrestacao(caso, dadosCep);
   dados.VARA_CIDADE_REGIAO = montarVaraCidadeRegiao(caso, local) || '[VARA / CIDADE / REGIÃO]';
-  dados.LOCAL_PRESTACAO_ENDERECO = caso.local_prestacao || caso.recl1_logradouro || (r1 && r1.endereco) || '[LOCAL DE PRESTAÇÃO]';
+  // LOCAL DE PRESTAÇÃO: nunca o endereço residencial do reclamante. Preferência:
+  // tomadora (recl2) > local informado > empregadora (recl1/receita).
+  const residEnd = (caso.recl_endereco || '').trim();
+  const localInformado =
+    caso.local_prestacao && String(caso.local_prestacao).trim() !== residEnd ? caso.local_prestacao : null;
+  dados.LOCAL_PRESTACAO_ENDERECO =
+    localInformado || caso.recl2_logradouro || caso.recl1_logradouro || (r1 && r1.endereco) || '[LOCAL DE PRESTAÇÃO]';
   dados.RITO = attrs.rito === 'sumarissimo' ? 'sumaríssimo' : 'ordinário';
 
   // 4) Reclamante
@@ -197,6 +212,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.RECL_NASCIMENTO = dataExtenso(caso.recl_nascimento) || '[DATA DE NASCIMENTO]';
   dados.RECL_FILIACAO = caso.recl_filiacao || '[FILIAÇÃO]';
   dados.RECL_ENDERECO = caso.recl_endereco || '[ENDEREÇO DO RECLAMANTE]';
+  dados.RECL_EMAIL = caso.recl_email || '';
 
   // 5) Reclamadas
   // Nome da reclamada vem da ENTREVISTA (fonte primária); o CNPJ oficial só
@@ -207,7 +223,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.RECLAMADA1_ENDERECO = (r1 && r1.endereco) || caso.recl1_logradouro || '[ENDEREÇO - confirmar]';
   dados.RECLAMADA2_RAZAO = caso.recl2_nome || (r2 && r2.razao_social) || '';
   dados.RECLAMADA2_CNPJ = (r2 && r2.cnpj) || caso.recl2_cnpj || '';
-  dados.RECLAMADA2_ENDERECO = (r2 && r2.endereco) || '';
+  dados.RECLAMADA2_ENDERECO = caso.recl2_logradouro || (r2 && r2.endereco) || '';
 
   // 6) Contrato / rescisão
   const tipo = caso.tipo_dispensa || attrs.tipo_dispensa || 'sem_justa_causa';
@@ -230,7 +246,9 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
 
   // 9) Teses (dados de apoio)
   dados.ACUMULO_ATIVIDADES = caso.acumulo_atividades || caso.acumulo_funcao || '';
-  dados.DESVIO_ATIVIDADES = caso.desvio_atividades || '';
+  // Desvio: se a flag acendeu mas o parser não descreveu as atividades, evita o
+  // placeholder vazio (que gera "funções de VIGILANTE, , não recebeu" no template).
+  dados.DESVIO_ATIVIDADES = caso.desvio_atividades || (caso.tem_desvio ? 'atividades diversas da função contratada' : '');
   dados.SALARIOS_ABERTO = caso.salarios_aberto || '';
   dados.ASSIDUIDADE_PROMETIDO = valorOuTexto(caso.assiduidade_prometido);
   dados.ASSIDUIDADE_PAGO = valorOuTexto(caso.assiduidade_pago);

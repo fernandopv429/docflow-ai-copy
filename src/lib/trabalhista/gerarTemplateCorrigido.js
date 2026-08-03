@@ -55,6 +55,14 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
   if ((!jaTem467 || !jaTem477 || !jaTemSalarios) && xml.includes(FGTS)) {
     xml = xml.replace(FGTS, FGTS + MULTAS);
   }
+  // 3) E-mail pessoal do reclamante: substitui o texto fixo "O autor não possui
+  // correio eletrônico" por um campo {{RECL_EMAIL}} preenchido pelo parser.
+  if (xml.includes('O autor n\u00e3o possui correio eletr\u00f4nico')) {
+    xml = xml.replace(
+      'O autor n\u00e3o possui correio eletr\u00f4nico',
+      'O autor possui endere\u00e7o de e-mail pessoal: {{RECL_EMAIL}}'
+    );
+  }
 
   zip.file('word/document.xml', xml);
   const blob = zip.generate({

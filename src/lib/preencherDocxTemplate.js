@@ -42,6 +42,27 @@ function aplicarGenero(zip) {
   zip.file(alvo, xml);
 }
 
+// Concordância de gênero MASCULINA: o template-mestre veio com adjetivos no
+// feminino (copiados de um modelo de reclamante mulher). Quando o reclamante é
+// homem, masculiniza SÓ os termos que se referem inequivocamente ao autor/
+// obreiro (frase a frase, seguro — nunca toca em "reclamada", que é a empresa).
+const FRASES_MASC = [
+  ['ter sido contratada pela', 'ter sido contratado pela'],
+  ['ter sido contratada', 'ter sido contratado'],
+  ['foi prejudicada de forma', 'foi prejudicado de forma'],
+  ['foi prejudicada', 'foi prejudicado'],
+];
+function aplicarGeneroMasc(zip) {
+  const alvo = 'word/document.xml';
+  const file = zip.file(alvo);
+  if (!file) return;
+  let xml = file.asText();
+  for (const [a, b] of FRASES_MASC) {
+    if (a !== b) xml = substituirFraseTagTolerant(xml, a, b);
+  }
+  zip.file(alvo, xml);
+}
+
 // Escapa texto para uso em regex
 function escaparRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -153,8 +174,12 @@ export function preencherDocxTemplate(arrayBuffer, dados) {
   const outZip = doc.getZip();
   // Correções pós-preenchimento (erros recorrentes do template e duplicações do docxtemplater)
   corrigirTextoFinal(outZip);
-  // Concordância de gênero após o preenchimento (só quando reclamante = mulher)
-  if ((dados?.RECL_GENERO || '').toUpperCase() === 'F') aplicarGenero(outZip);
+  // Concordância de gênero após o preenchimento. O template-mestre veio com
+  // adjetivos no feminino (modelo de reclamante mulher): para homem, masculiniza
+  // os termos que se referem ao autor/obreiro; para mulher, aplica a feminilização.
+  const generoRecl = (dados?.RECL_GENERO || '').toUpperCase();
+  if (generoRecl === 'F') aplicarGenero(outZip);
+  else aplicarGeneroMasc(outZip);
   return outZip.generate({
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

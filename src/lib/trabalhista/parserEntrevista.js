@@ -31,6 +31,7 @@ const CASO_SCHEMA = {
     recl_nascimento: { type: 'string', description: 'Formato YYYY-MM-DD' },
     recl_filiacao: { type: 'string', description: 'Nome da mãe e do pai' },
     recl_endereco: { type: 'string' },
+    recl_email: { type: 'string', description: 'E-mail pessoal do reclamante, se informado na entrevista' },
 
     // Reclamadas
     recl1_nome: { type: 'string', description: 'Razão social da 1ª reclamada (empregadora)' },
@@ -38,6 +39,7 @@ const CASO_SCHEMA = {
     recl1_logradouro: { type: 'string' },
     recl2_nome: { type: 'string', description: '2ª reclamada / tomadora de serviços, se houver' },
     recl2_cnpj: { type: 'string' },
+    recl2_logradouro: { type: 'string', description: 'Endereço da 2ª reclamada (tomadora de serviços), quando houver' },
     local_prestacao: { type: 'string', description: 'Endereço do local onde os serviços foram prestados (define a competência)' },
     comarca_uf: { type: 'string', description: 'UF com 2 letras (ex.: SP)' },
 
@@ -162,8 +164,8 @@ const REGRAS_TESES = [
 // Campos do schema categorizados por tipo para coerção determinística.
 const CAMPOS_STRING = [
   'titulo', 'recl_nome', 'recl_genero', 'recl_nacionalidade', 'recl_estado_civil', 'recl_cpf', 'recl_rg',
-  'recl_pis', 'recl_ctps', 'recl_serie', 'recl_nascimento', 'recl_filiacao', 'recl_endereco',
-  'recl1_nome', 'recl1_cnpj', 'recl1_logradouro', 'recl2_nome', 'recl2_cnpj', 'local_prestacao', 'comarca_uf',
+  'recl_pis', 'recl_ctps', 'recl_serie', 'recl_nascimento', 'recl_filiacao', 'recl_endereco', 'recl_email',
+  'recl1_nome', 'recl1_cnpj', 'recl1_logradouro', 'recl2_nome', 'recl2_cnpj', 'recl2_logradouro', 'local_prestacao', 'comarca_uf',
   'data_admissao', 'data_rescisao', 'funcao', 'tipo_dispensa', 'jornada_horario', 'escala',
   'intervalo_usufruido', 'prorrogacao_jornada', 'acumulo_atividades', 'desvio_atividades',
   'salarios_aberto', 'doenca_descricao', 'cct_ano', 'cct_clausulas', 'cct_clausula_multa',
@@ -282,10 +284,11 @@ DADOS BÁSICOS:
 - CPF/CNPJ/PIS somente números.
 - recl_serie: número de série da CTPS ("serie: 25795" → "25795"). recl_ctps: só o número da CTPS (sem série).
 - recl_genero: 'M' ou 'F' inferido do nome ("brasileiro/solteiro" → 'M').
+- recl_email: e-mail pessoal do reclamante quando informado (ex.: marcos81769111@gmail.com).
 
 MUNICÍPIO/GRAFIA:
 - Grafia correta dos municípios: "Itapecerica da Serra/SP" (NUNCA "Itapecerica da Terra"), "São Paulo/SP", "Osasco/SP".
-- comarca_uf: UF com 2 letras. local_prestacao: endereço completo do local onde o reclamante prestava serviços (define a competência territorial — art. 651 CLT).
+- comarca_uf: UF com 2 letras. local_prestacao: endereço completo do LOCAL DE PRESTAÇÃO DOS SERVIÇOS (define a competência territorial — art. 651 CLT). NUNCA use o endereço residencial do reclamante; se houver 2ª reclamada (tomadora), use o endereço DELA (grave também em recl2_logradouro); senão use o endereço da empregadora (recl1_logradouro).
 - Se houver CEP, complete o município/UF; confira a grafia antes de gravar.
 
 MULTA CONVENCIONAL:
@@ -314,8 +317,8 @@ JORNADA E HORAS EXTRAS:
 ACÚMULO/DESVIO DE FUNÇÃO:
 - Acúmulo = exerceu ALÉM das suas funções habituais outras atribuições (ex: Prevenção de Perdas, rondas, recepção).
 - Desvio = exerceu funções de cargo SUPERIOR/DIVERSO do contratado.
-- "passou a acumular funções de Prevenção de Perdas: conferências de mercadorias, controle de validade, registros, conferência de cargas, controle de paletes" → tem_acumulo = true, acumulo_atividades = descrição completa.
-- Defina tem_acumulo = true com suporte explícito; tem_desvio = true se exercia função claramente superior/diferente.
+- Vigilante executando Prevenção de Perdas (conferência de mercadorias, controle/verificação de validade de produtos, conferência de cargas, controle de paletes, registros operacionais) → tem_desvio = true (NUNCA tem_acumulo — seria bis in idem com o desvio) e desvio_atividades = descrição completa das atividades.
+- Acúmulo = outras atribuições além das habituais que NÃO se confundam com desvio (rondas de vigilante, recepção, limpeza). Defina tem_acumulo = true só nesse caso, com suporte explícito.
 
 PERICULOSIDADE:
 - Vigilante → tem_periculosidade = true POR PADRÃO (Lei 7.102/83 + Portaria MTE 1885/2013 — categoria profissional de vigilância tem adicional de periculosidade mesmo sem armamento pessoal quando guarda patrimônio).
