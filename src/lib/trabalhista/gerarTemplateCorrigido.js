@@ -183,6 +183,16 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     if (xml.includes(a)) { xml = _substituirFraseTagTolerant(xml, a, b); autorCorrigido = true; }
   }
 
+  // 11) E-MAIL NO PREÂMBULO: garante que a qualificação do reclamante tenha
+  // o campo {{RECL_EMAIL}} (e-mail pessoal do cliente). Se o template original
+  // não o incluir após o endereço, insere ", com correio eletrônico
+  // {{RECL_EMAIL}}" logo após {{RECL_ENDERECO}}. Não duplica se já existir.
+  let emailPreambuloAdicionado = false;
+  if (xml.includes('{{RECL_ENDERECO}}') && !/{{RECL_EMAIL}}/.test(xml.slice(xml.indexOf('{{RECL_ENDERECO}}'), xml.indexOf('{{RECL_ENDERECO}}') + 300))) {
+    xml = xml.replace(/(\{\{RECL_ENDERECO\}\})/, '$1, com correio eletrônico {{RECL_EMAIL}}');
+    emailPreambuloAdicionado = true;
+  }
+
   zip.file('word/document.xml', xml);
   const blob = zip.generate({
     type: 'blob',
@@ -205,5 +215,6 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     multa477Adicionada: !jaTem477,
     salariosAbertoAdicionado: !jaTemSalarios,
     autorCorrigido,
+    emailPreambuloAdicionado,
   };
 }

@@ -95,6 +95,17 @@ const FRASES_MASC = [
   ['da obreira', 'do obreiro'],
   ['a obreira', 'o obreiro'],
   ['obreira', 'obreiro'],
+  // Dano moral — particípios/adjetivos que a IA redigiu no feminino e se
+  // referem inequivocamente ao reclamante (homem). Só roda para M, então o
+  // risco de atingir substantivos femininos (humilhação, situação) é baixo.
+  ['estava diretamente ligada', 'estava diretamente ligado'],
+  ['diretamente ligada', 'diretamente ligado'],
+  ['rendê-la', 'rendê-lo'],
+  ['humilhada', 'humilhado'],
+  ['constrangida', 'constrangido'],
+  ['envergonhada', 'envergonhado'],
+  ['acuada', 'acuado'],
+  ['menosprezada', 'menosprezado'],
 ];
 function aplicarGeneroMasc(zip) {
   const alvo = 'word/document.xml';

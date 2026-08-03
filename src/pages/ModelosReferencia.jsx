@@ -72,6 +72,7 @@ export default function ModelosReferencia() {
         r.multa477Adicionada && 'multa art. 477',
         r.salariosAbertoAdicionado && 'salários em aberto',
         r.autorCorrigido && 'gênero (o autor → o reclamante)',
+        r.emailPreambuloAdicionado && 'e-mail no preâmbulo',
       ].filter(Boolean);
       setMsg(`Template corrigido baixado${itens.length ? ` (adicionado: ${itens.join(', ')})` : ' — já estava atualizado'}. Envie-o em “Trocar template” para torná-lo oficial.`);
     } catch (err) {
