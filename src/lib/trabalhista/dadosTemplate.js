@@ -389,5 +389,20 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
       `O reclamante requer a aplicação da multa convencional prevista na Convenção Coletiva de Trabalho da categoria${anoCct ? ` – ${anoCct} e as anteriores` : ''}${clMulta}, por descumprimento, pela reclamada, das obrigações convencionais a seguir elencadas, nos termos da cláusula de penalidade da referida convenção:`;
   }
 
+  // Fallback da seção "DA JORNADA DE TRABALHO": narrativa fática coerente
+  // quando a IA não redigir o BLOCO_JORNADA (desativada ou retorno vazio).
+  // Constrói o parágrafo a partir dos campos do caso (jornada_horario,
+  // escala, prorrogacao_jornada) — SEM a tag crua {{PRORROGACAO_JORNADA}},
+  // que aparecia no template quando o parser não extraía o campo. A IA
+  // sobrescreve via BLOCO_JORNADA (geracao.js) quando ativa.
+  {
+    const hor = caso.jornada_horario || '[HORÁRIOS]';
+    const esc = caso.escala || (dados.escala_12x36 ? '12x36' : dados.escala_4x2 ? '4x2' : '[ESCALA]');
+    const prorrog = caso.prorrogacao_jornada ? `, estendia a jornada ${caso.prorrogacao_jornada}` : '';
+    dados.BLOCO_JORNADA =
+      `Para elucidação dos direitos aqui pleiteados, o reclamante laborou no seguinte horário: ${hor}, dependendo das necessidades dos serviços${prorrog}, sob pena de advertência, ou até mesmo justa causa, em escala ${esc}, com a concessão parcial do intervalo para refeição e descanso de aproximadamente 10/15 minutos. ` +
+      `Cumpre ressaltar que o obreiro pode ter feito outras escalas e horários que serão devidamente apreciados em audiência inaugural e, posteriormente, em sede de réplica.`;
+  }
+
   return dados;
 }
