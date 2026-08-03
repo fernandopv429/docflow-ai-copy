@@ -5,17 +5,20 @@ import { blocoRegrasCriticas } from './regrasCriticas';
 import { formatBRL } from './mathUtils';
 
 // ============================================================
-// REDAÇÃO POR ESPECIALISTAS DE IA (por tópico, contexto completo)
+// REDAÇÃO POR IA — ANÁLISE ÚNICA (um único LLM para todos os capítulos)
 //
-// Estratégia: TODOS os especialistas recebem o MESMO contexto completo
-// (caso + CCT + valores determinísticos + preâmbulo), mas cada um redige
-// APENAS o seu capítulo. O cálculo continua 100% determinístico (mathUtils);
-// a IA nunca faz aritmética nem inventa cláusula. A junção final é mecânica
-// (cada bloco vai para o seu {{BLOCO_*}} do template) — não há IA "costurando".
+// Antes: 6 especialistas, 6 chamadas paralelas (uma por tópico).
+// Agora: 1 única chamada à IA, que escreve TODOS os capítulos ativos
+// da peça em um único retorno JSON. O cálculo continua 100%
+// determinístico (mathUtils); a IA nunca faz aritmética nem inventa
+// cláusula. A junção final é mecânica (cada bloco vai para o seu
+// {{BLOCO_*}} do template) — não há IA "costurando".
 //
-// Registro DETERMINÍSTICO: o código decide quais capítulos acendem, qual campo
-// do template cada um preenche e o recorte (instrucao). O texto editável de
-// cada especialista fica em EspecialistaConfig.prompt_sistema (casado por `numero`).
+// Registro DETERMINÍSTICO: o código decide quais capítulos acendem,
+// qual campo do template cada um preenche e o recorte (instrucao). O
+// texto editável fica em EspecialistaConfig.prompt_sistema (casado por
+// `numero`); quando houver mais de um ativo, o modelo usado é o do
+// primeiro config encontrado (fallback claude_sonnet_4_6).
 // ============================================================
 export const ESPECIALISTAS = [
   {
@@ -76,8 +79,11 @@ const MODELOS_VALIDOS = {
   claude_sonnet_4_6: 'claude_sonnet_4_6',
   gemini_3_1_pro: 'gemini_3_1_pro',
 };
-function modeloDoEspecialista(cfg) {
-  return MODELOS_VALIDOS[cfg?.modelo_ia] || 'claude_sonnet_4_6';
+function modeloUnico(configs) {
+  for (const cfg of configs || []) {
+    if (MODELOS_VALIDOS[cfg?.modelo_ia]) return MODELOS_VALIDOS[cfg.modelo_ia];
+  }
+  return 'claude_sonnet_4_6';
 }
 
 function resumoCalculos(calculos) {
@@ -126,12 +132,12 @@ function municipiosDoCaso(caso) {
   return out;
 }
 
-// Contexto COMPARTILHADO (idêntico para todos os especialistas). Fica no início
-// do prompt de cada chamada — prefixo estável, pronto para prompt caching quando
-// o provedor/SDK expuser esse controle (hoje reenviado por chamada).
+// Contexto COMPARTILHADO da análise única. Fica no prompt da chamada —
+// prefixo estável, pronto para prompt caching quando o provedor/SDK
+// expuser esse controle (hoje reenviado por chamada).
 export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAtivos }) {
   return [
-    'CONTEXTO COMPLETO DO CASO (leia tudo; você é responsável por escrever UM único capítulo).',
+    'CONTEXTO COMPLETO DO CASO (leia tudo; você escreverá TODOS os capítulos ativos em uma única resposta JSON).',
     BLOCO_ENGENHARIA_JURIDICA,
     blocoRegrasCriticas({ municipios: municipiosDoCaso(caso) }),
     '',
@@ -139,8 +145,9 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
     '- Argumente SOMENTE sobre fatos presentes no caso. Se faltar um fato essencial, escreva [CONFIRMAR: ...] em vez de inventar.',
     '- NÃO faça aritmética. Use exatamente os valores de VALORES CALCULADOS.',
     '- Cite SOMENTE as cláusulas listadas em CLÁUSULAS DA CCT. Nunca invente número de cláusula.',
-    '- Escreva APENAS o capítulo indicado. NÃO escreva endereçamento, qualificação das partes, valor da causa, honorários, data ou fecho — o sistema gera isso.',
-    '- Padrão de redação: fato → fundamento legal (CLT) + Súmula do TST + cláusula da CCT → impugnação (Súmula 338, quando couber) → pedido com reflexos (DSR, aviso, férias+1/3, 13º, FGTS+40%).',
+    '- Escreva APENAS os capítulos solicitados abaixo. NÃO escreva endereçamento, qualificação das partes, valor da causa, honorários, data ou fecho — o sistema gera isso.',
+    '- Padrão de redação de cada capítulo: fato → fundamento legal (CLT) + Súmula do TST + cláusula da CCT → impugnação (Súmula 338, quando couber) → pedido com reflexos (DSR, aviso, férias+1/3, 13º, FGTS+40%).',
+    '- Cada capítulo NÃO deve invadir o tópico de outro. Respeite o escopo indicado em cada um.',
     '',
     'DADOS DO CASO:',
     resumoCaso(caso),
@@ -151,12 +158,13 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
     'CLÁUSULAS DA CCT (grounding — só cite estas):',
     resumoCct(dadosCct),
     '',
-    `CAPÍTULOS ATIVOS NESTA PEÇA (para você não invadir o tópico de outro especialista): ${blocosAtivos.join(', ')}.`,
+    `CAPÍTULOS ATIVOS NESTA PEÇA: ${blocosAtivos.join(', ')}.`,
   ].join('\n');
 }
 
-// Orquestrador: acende os especialistas conforme as flags (determinístico),
-// roda os ativos EM PARALELO (com llmRetry) e devolve os blocos por campo.
+// Orquestrador: acende os capítulos conforme as flags (determinístico),
+// faz UMA ÚNICA chamada à IA devolvendo TODOS os capítulos ativos de
+// uma vez (JSON) e devolve os blocos por campo do template.
 export async function redigirTesesIA({ caso, calculos, dadosCct, dados, onTool } = {}) {
   const notify = (m) => { try { onTool?.(m); } catch (e) { /* ignora */ } };
 
@@ -178,34 +186,53 @@ export async function redigirTesesIA({ caso, calculos, dadosCct, dados, onTool }
   const blocosAtivos = ativos.map((e) => e.nome);
   const contexto = montarContextoCompartilhado({ caso: c, calculos: calculos || [], dadosCct, blocosAtivos });
 
-  notify(`Redigindo ${ativos.length} capítulo(s) por especialistas de IA (contexto completo, escrita por tópico)...`);
+  // Schema JSON dinâmico: uma propriedade string por capítulo ativo.
+  // O root é sempre "object" (req. do InvokeLLM).
+  const properties = {};
+  const tarefas = ativos.map((e) => {
+    const cfg = cfgPorNumero.get(e.numero);
+    const promptSistema = cfg?.prompt_sistema || e.promptPadrao;
+    properties[e.campo] = {
+      type: 'string',
+      description: `Capítulo: ${e.nome}. ${e.instrucao} Papel: ${promptSistema}`,
+    };
+    return `### ${e.campo} — ${e.nome}\nPapel: ${promptSistema}\nTarefa: ${e.instrucao}`;
+  });
 
-  const resultados = await Promise.all(
-    ativos.map(async (e) => {
-      const cfg = cfgPorNumero.get(e.numero);
-      const promptSistema = cfg?.prompt_sistema || e.promptPadrao;
-      const model = modeloDoEspecialista(cfg);
-      const prompt = [
-        contexto,
-        '',
-        '=============================',
-        `SEU PAPEL: ${promptSistema}`,
-        `SUA TAREFA: ${e.instrucao}`,
-        'Responda APENAS com o texto do capítulo, em português jurídico, sem rótulo "Capítulo X" e sem comentários.',
-      ].join('\n');
-      try {
-        const r = await invokeLLMComRetry({ prompt, model }, { onRetry: (n) => notify(`Reintento ${n} — ${e.nome}...`) });
-        const texto = typeof r === 'string' ? r : (r?.text || r?.output || r?.reply || String(r || ''));
-        notify(`Capítulo redigido: ${e.nome}`);
-        return { campo: e.campo, texto: (texto || '').trim() };
-      } catch (err) {
-        notify(`Falha ao redigir "${e.nome}": ${err.message}`);
-        return { campo: e.campo, texto: '' };
-      }
-    })
-  );
+  notify(`Redigindo ${ativos.length} capítulo(s) em análise única (uma chamada à IA)...`);
 
-  const blocos = {};
-  for (const r of resultados) if (r.texto) blocos[r.campo] = r.texto;
-  return { blocos, especialistasUsados: blocosAtivos };
+  const prompt = [
+    contexto,
+    '',
+    '=============================',
+    'TAREFA ÚNICA: escreva TODOS os capítulos abaixo em UMA resposta JSON.',
+    'Cada chave do JSON é o campo do template; o valor é o texto do capítulo em português jurídico, sem rótulo "Capítulo X" e sem comentários.',
+    'Não inclua nenhum texto fora do JSON. Campos sem informação: retorne string vazia.',
+    '',
+    'CAPÍTULOS A REDIGIR (escreva todos):',
+    tarefas.join('\n\n'),
+  ].join('\n');
+
+  const model = modeloUnico(configs);
+
+  try {
+    const r = await invokeLLMComRetry(
+      { prompt, model, response_json_schema: { type: 'object', properties } },
+      { onRetry: (n) => notify(`Reintento ${n} — análise única...`) }
+    );
+    const obj = (r && typeof r === 'object' && !Array.isArray(r)) ? r : {};
+
+    const blocos = {};
+    for (const e of ativos) {
+      const texto = typeof obj[e.campo] === 'string' ? obj[e.campo].trim() : '';
+      if (texto) blocos[e.campo] = texto;
+    }
+    const escritos = Object.keys(blocos);
+    if (escritos.length) notify(`Análise única concluída: ${escritos.length}/${ativos.length} capítulo(s) redigido(s).`);
+    else notify('Análise única não retornou capítulos — a peça segue com o texto-padrão do template.');
+    return { blocos, especialistasUsados: blocosAtivos };
+  } catch (err) {
+    notify(`Falha na análise única: ${err.message}`);
+    return { blocos: {}, especialistasUsados: blocosAtivos };
+  }
 }
