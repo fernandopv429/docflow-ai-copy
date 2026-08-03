@@ -51,10 +51,13 @@ export function extrairDeterministico(texto) {
   const t = texto;
   const caso = {};
 
-  // Nome do reclamante — texto antes de "brasileiro(a)"
+  // Nome do reclamante — texto antes de "brasileiro(a)" ou "nascido em".
+  // O PDF padronizado insere "nascido em DD/MM/YYYY" entre o nome e
+  // "brasileiro(a)", quebrando o regex anterior. Aceita ambos os formatos.
   const nome = matchAny(t, [
-    /^([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ\s]+?),\s*brasileir[oa]/,
-    /^([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ\s]+?),\s*portador/,
+    /(?:^|\n)\s*([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ\s]+?),\s*nascid[oa]\s+em\s*\d{2}\/\d{2}\/\d{4}/,
+    /(?:^|\n)\s*([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ\s]+?),\s*brasileir[oa]/,
+    /(?:^|\n)\s*([A-ZÀ-Ý][A-ZÀ-Ýa-zà-ÿ\s]+?),\s*portador/,
   ]);
   if (nome) caso.recl_nome = nome.trim();
 
@@ -99,13 +102,9 @@ export function extrairDeterministico(texto) {
   ]);
   if (end) caso.recl_endereco = end.replace(/[,\s]+$/, '').trim();
 
-  // Função — texto após "FUNÇÃO:" até o próximo rótulo (Admissão:, Jornada:,
-  // etc.). O regex anterior usava [A-ZÀ-Ýa-zà-ÿ\s]+ até \n, mas a entrevista
-  // tem rótulos separados por ESPAÇOS, não newlines — então "FUNÇÃO: AUXILIAR
-  // DE CORTADOR Admissão: 10/05/2023" não casava (o ":" de "Admissão:" não é
-  // letra) e a função ficava vazia ([FUNÇÃO] no template). Agora captura [^\n]+
-  // e corta no próximo rótulo.
-  const funcMatch = /FUN[ÇC][ÃA]O[:\s]*([^\n]+)/i.exec(t);
+  // Função — texto após "FUNÇÃO:" ou "CARGO:" até o próximo rótulo.
+  // O PDF padronizado usa "CARGO:" em vez de "FUNÇÃO:".
+  const funcMatch = /(?:FUN[ÇC][ÃA]O|CARGO)[:\s]*([^\n]+)/i.exec(t);
   if (funcMatch) {
     const funcText = cortarAteRotulo(funcMatch[1]);
     if (funcText && !ESTADOS_CIVIS.test(funcText)) caso.funcao = funcText;
@@ -150,11 +149,18 @@ export function extrairDeterministico(texto) {
   const emailPessoal = extrairEmailPessoal(t);
   if (emailPessoal) caso.recl_email = emailPessoal;
 
-  // Datas de admissão e rescisão
+  // Datas de admissão e rescisão — múltiplas fontes:
+  // - "TEMPO LABORADO: DD/MM/YYYY - DD/MM/YYYY" (PDF padronizado)
+  // - "Admissão: DD/MM/YYYY" + "Sem JUSTA CAUSA: DD/MM/YYYY" (texto livre)
+  const tempoMatch = /TEMPO\s+LABORADO[:\s]*(\d{2}\/\d{2}\/\d{4})\s*[-–—]\s*(\d{2}\/\d{2}\/\d{4})/i.exec(t);
+  if (tempoMatch) {
+    caso.data_admissao = paraIsoData(tempoMatch[1]);
+    caso.data_rescisao = paraIsoData(tempoMatch[2]);
+  }
   const adm = matchAny(t, /Admiss[ãa]o[:\s]*(\d{2}\/\d{2}\/\d{4})/i);
-  if (adm) caso.data_admissao = paraIsoData(adm);
+  if (adm && !caso.data_admissao) caso.data_admissao = paraIsoData(adm);
   const res = matchAny(t, [/(?:Sem\s*JUSTA\s*CAUSA|Rescis[ãa]o|Dispensa)[:\s]*(\d{2}\/\d{2}\/\d{4})/i]);
-  if (res) caso.data_rescisao = paraIsoData(res);
+  if (res && !caso.data_rescisao) caso.data_rescisao = paraIsoData(res);
 
   // Salário — tenta múltiplos rótulos comuns em roteiros de entrevista.
   // Sem isto, "REMUNERAÇÃO: R$ 2.148,22" ou "Salário: 2148,22" sem "R$"
@@ -180,8 +186,9 @@ export function extrairDeterministico(texto) {
     if (n != null) caso.maior_remuneracao = n;
   }
 
-  // Jornada / escala — captura até o próximo rótulo (ex.: HORAS EXTRAS:)
-  const jornadaMatch = /Jornada[:\s]*([^\n]+)/i.exec(t);
+  // Jornada / escala — captura até o próximo rótulo (ex.: HORAS EXTRAS:).
+  // O PDF padronizado usa "ESCALA/HORARIO:" em vez de "Jornada:".
+  const jornadaMatch = /(?:Jornada|ESCALA\s*\/?\s*HOR[ÁA]RIO)[:\s]*([^\n]+)/i.exec(t);
   if (jornadaMatch) caso.jornada_horario = cortarAteRotulo(jornadaMatch[1]);
   const escalaMatch = matchAny(t, /(\d+\s*x\s*\d+)/i);
   if (escalaMatch) caso.escala = escalaMatch.replace(/\s+/g, '').toLowerCase();
@@ -239,12 +246,16 @@ export function extrairDeterministico(texto) {
   else if (/rescis[ãa]o\s*indireta/i.test(t)) caso.tipo_dispensa = 'rescisao_indireta';
   else if (/pedido\s*de\s*demiss[ãa]o/i.test(t)) caso.tipo_dispensa = 'nulidade_pedido_demissao';
 
-  // Dano moral — trata o rótulo combinado "DANO MORAL / DIREITOS LESADOS:"
-  // (comum em roteiros do escritório) capturando só o texto após os dois pontos,
-  // sem o prefixo "/ DIREITOS LESADOS:" que vazava para o template.
-  if (/dano\s*moral/i.test(t)) {
+  // Dano moral / fatos narrados — trata três formatos:
+  // 1. "DANO MORAL / DIREITOS LESADOS:" (roteiro texto livre)
+  // 2. "DANO MORAL:" (roteiro antigo)
+  // 3. "FATOS NARRADOS PELO RECLAMANTE" (PDF padronizado — seção final)
+  // O PDF não tem o rótulo "DANO MORAL"; os fatos do dano estão na seção
+  // de fatos narrados, que pode conter desconto indevido, insalubridade etc.
+  if (/dano\s*moral/i.test(t) || /fatos\s+narrados/i.test(t)) {
     caso.tem_dano_moral = true;
     const dano = matchAny(t, [
+      /FATOS\s+NARRADOS\s+PELO\s+RECLAMANTE\s*\n+([\s\S]+)/i,
       /DANO\s*MORAL\s*\/\s*DIREITOS\s+LESADOS[:\s]*([^\n]+)/i,
       /DANO\s*MORAL[:\s]*\n?(.+?)(?:\n\n|$)/i,
     ]);

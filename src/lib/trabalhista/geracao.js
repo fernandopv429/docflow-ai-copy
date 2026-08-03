@@ -120,7 +120,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   if (caso.funcao && ESTADOS_CIVIS.test(caso.funcao.trim())) {
     caso.funcao = casoDet.funcao || '';
   }
-  const MARC_ENTREVISTA = /\b(?:FUN[ÇC][ÃA]O|DANO\s+MORAL|DIREITOS\s+LESADOS|JORNADA|SAL[ÁA]RIO|ADMISS[ÃA]O|RESCIS[ÃA]O|CEP|CNPJ|ENDERE[ÇC]O|ESTADO\s+CIVIL|TEMPO\s+LABORADO|DESvio|AC[ÚU]MULO|FOLGAS|HORAS\s+EXTRAS|GRATIFICA[ÇC][ÃA]O)\s*[:/]/i;
+  const MARC_ENTREVISTA = /\b(?:FUN[ÇC][ÃA]O|CARGO|DANO\s+MORAL|DIREITOS\s+LESADOS|FATOS\s+NARRADOS|JORNADA|SAL[ÁA]RIO|ADMISS[ÃA]O|RESCIS[ÃA]O|CEP|CNPJ|ENDERE[ÇC]O|ESTADO\s+CIVIL|TEMPO\s+LABORADO|DESvio|AC[ÚU]MULO|FOLGAS|HORAS\s+EXTRAS|GRATIFICA[ÇC][ÃA]O|ESCALA\s*\/\s*HOR)\s*[:/]/i;
   for (const campo of ['jornada_horario', 'desvio_atividades', 'acumulo_atividades', 'local_prestacao', 'recl_endereco', 'funcao', 'escala', 'prorrogacao_jornada', 'intervalo_usufruido']) {
     if (caso[campo] && MARC_ENTREVISTA.test(String(caso[campo]))) {
       const det = casoDet[campo];
@@ -132,7 +132,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   // "Desconto indevido de 6%..."). Se sobrar texto útil, mantém.
   if (caso.dano_fatos && MARC_ENTREVISTA.test(String(caso.dano_fatos))) {
     const limpo = String(caso.dano_fatos)
-      .replace(/^(?:\/\s*)?(?:DIREITOS\s+LESADOS|DANO\s+MORAL)\s*[:/]\s*/i, '')
+      .replace(/^(?:\/\s*)?(?:FATOS\s+NARRADOS\s+PELO\s+RECLAMANTE|DIREITOS\s+LESADOS|DANO\s+MORAL)\s*[:/]\s*/i, '')
       .trim();
     caso.dano_fatos = limpo.length >= 20 ? limpo : '';
   }

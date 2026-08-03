@@ -282,6 +282,15 @@ export async function extrairCasoDeTexto(texto, fileUrls) {
 
 ATENÇÃO AO FORMATO: A entrevista pode ter rótulos separados por MÚLTIPLOS ESPAÇOS (não quebras de linha). Ex.: "FUNÇÃO: AUXILIAR DE CORTADOR   Admissão: 10/05/2023   Sem JUSTA CAUSA: 22/06/2026   Jornada: 5x2 - 07:00 às 17:00". Cada rótulo (FUNÇÃO:, Admissão:, Jornada:, HORAS EXTRAS:, GRATIFICAÇÃO:, ACÚMULO/DESVIO DE FUNÇÃO:, DANO MORAL / DIREITOS LESADOS:, etc.) inicia um campo DISTINTO — separe-os corretamente e NÃO inclua texto de um rótulo no valor de outro. O texto entre um rótulo e o próximo é o valor daquele campo.
 
+FORMATO PDF PADRONIZADO: A entrevista pode vir como PDF de formulário estruturado. Nesse formato:
+- Checkboxes: "(x) Sim" = marcado/afirmativo; "( ) Não" = desmarcado. "(x) Sem justa causa" = dispensa sem justa causa.
+- "CARGO:" equivale a "FUNÇÃO:" — extraia o cargo/ocupação do campo CARGO.
+- "TEMPO LABORADO: DD/MM/YYYY - DD/MM/YYYY" contém as datas de admissão (1ª) e rescisão (2ª). Se "Último dia trabalhado:" estiver em branco, use a 2ª data do TEMPO LABORADO como data_rescisao.
+- "ESCALA/HORARIO:" equivale a "Jornada:" — extraia a escala e os horários.
+- "FATOS NARRADOS PELO RECLAMANTE" é a seção final do formulário com a narrativa livre do cliente — contém os fatos concretos do dano moral, descontos indevidos, insalubridade, etc. Use esta seção como FONTE PRIMÁRIA para dano_fatos e fatos_narrados.
+- CHECKBOXES vs FATOS NARRADOS: Se um checkbox diz "(x) Não" para insalubridade/desconto indevido, MAS a seção FATOS NARRADOS descreve o fato (ex.: "forte odor proveniente de EVA", "desconto de 6% do vale-transporte"), considere o FATOS NARRADOS como prioritário — o cliente pode ter desmarcado o checkbox por desconhecimento técnico, mas narra o problema na seção livre.
+- "Utilizava EPI: Máscara, luva." na seção de Saúde → NÃO significa que EPIs eram adequados; verifique FATOS NARRADOS por menções a EPIs inadequados.
+
 ${blocoTexto}${blocoArquivos}
 
 === REGRAS DE EXTRAÇÃO CRÍTICAS (HARD RULES — sob pena de falha) ===
@@ -371,9 +380,10 @@ TIPO DE DISPENSA:
 - Falta grave patronal → rescisao_indireta.
 
 DANO MORAL:
-- Acúmulo de funções sem contraprestação + desconto indevido de consignado = fatos concretos para dano moral.
-- tem_dano_moral = true se há ao menos 1 fato concreto (humilhação, assédio, desconto indevido, doença sem comunicação, etc.).
-- dano_fatos: redija 2-4 frases objetivas descrevendo os fatos concretos do dano (inclua o desconto indevido do consignado e/ou o acúmulo sem compensação).
+- Acúmulo de funções sem contraprestação + desconto indevido = fatos concretos para dano moral.
+- tem_dano_moral = true se há ao menos 1 fato concreto (humilhação, assédio, desconto indevido, insalubridade, ambiente insalubre, etc.).
+- dano_fatos: redija 2-4 frases objetivas descrevendo os fatos concretos do dano. No PDF padronizado, extraia da seção "FATOS NARRADOS PELO RECLAMANTE" — desconto indevido de VT, ambiente insalubre com odor de EVA, EPIs inadequados, etc.
+- INSALUBRIDADE: Se a seção FATOS NARRADOS descrever "forte odor proveniente de EVA", "sem circulação de ar", "EPIs inadequados" — ative tem_insalubridade = true E insalubridade_descricao com a descrição, mesmo se o checkbox diz "Não".
 
 FATOS NARRADOS:
 - Liste TODA irregularidade/fato específico mencionado, um por item, sem omitir NADA:
