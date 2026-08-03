@@ -29,6 +29,8 @@ const CALC_CAMPO = {
   'Vale-transporte nas folgas': 'VALOR_VT_TOTAL',
   'Gratificação de função (10%)': 'VALOR_GRATIFICACAO',
   'Desvio de função (50%)': 'VALOR_DESVIO',
+  'Multa do art. 477 da CLT': 'VALOR_MULTA_477',
+  'Salários em aberto': 'VALOR_SALARIOS_ABERTO',
 };
 
 const TETO_VALOR_CAUSA = 400000;
@@ -50,6 +52,7 @@ export const CAMPOS_TEMPLATE = [
   'VALOR_SALDO_SALARIO', 'VALOR_MULTA_467',
   'VALOR_AVISO_PREVIO', 'VALOR_13', 'VALOR_FERIAS', 'VALOR_FGTS', 'VALOR_MULTA_40',
   'VALOR_FT', 'VALOR_DSR', 'VALOR_DANO_MORAL_10X', 'VALOR_CAUSA_TOTAL', 'DATA_PECA',
+  'VALOR_MULTA_477', 'VALOR_SALARIOS_ABERTO',
 ];
 
 export const FLAGS_TEMPLATE = [

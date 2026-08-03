@@ -36,8 +36,29 @@ export const ESPECIALISTAS = [
     nome: 'Jornada e horas extras',
     campo: 'BLOCO_JORNADA',
     ativo: (d, c) => !!(d.escala_12x36 || d.escala_4x2 || c.jornada_horario || d.folgas_trabalhadas),
-    instrucao:
-      'Escreva APENAS o bloco de jornada: descaracterização da escala relatada (ex.: 12x36 – Súmula 85), intervalo intrajornada (art. 71 CLT), minutos residuais antes/depois e DSR/folgas trabalhadas — tratando EXCLUSIVAMENTE a escala efetivamente relatada. NÃO escreva dano moral, rescisão nem enquadramento funcional.',
+    // Instrução dinâmica: só instrua os tópicos extras quando as flags
+    // correspondentes estiverem acesas (evita a IA escrever tese não aplicável).
+    instrucao: (d, c) => {
+      let base =
+        'Escreva APENAS o bloco de jornada: descaracterização da escala relatada (ex.: 12x36 – Súmula 85), intervalo intrajornada (art. 71 CLT), minutos residuais antes/depois e DSR/folgas trabalhadas — tratando EXCLUSIVAMENTE a escala efetivamente relatada. NÃO escreva dano moral, rescisão nem enquadramento funcional.';
+      const extras = [];
+      if (d.periculosidade) {
+        extras.push(
+          'Adicional de periculosidade incidente sobre as horas extras e o adicional noturno (Súmula 132, I do TST e OJ SDI-1 nº 259 do E. TST) — peça as diferenças de todo o período contratual, com reflexos em DSR, aviso prévio, férias +1/3, 13º e FGTS +40%.'
+        );
+      }
+      if (d.adicional_noturno) {
+        extras.push(
+          'Adicional noturno e hora noturna reduzida (art. 73 da CLT) — peça as diferenças do percentual e da redução da hora noturna, com reflexos em DSR, aviso prévio, férias +1/3, 13º e FGTS +40%.'
+        );
+      }
+      if (d.folgas_trabalhadas) {
+        extras.push(
+          'Horas extras em folgas e feriados com adicional de 100% (Súmula 444 do TST) — peça o pagamento em dobro do descanso nos feriados laborados, com reflexos.'
+        );
+      }
+      return extras.length ? `${base}\nTÓPICOS ADICIONAIS (conforme os dados do caso): ${extras.join(' ')}` : base;
+    },
     promptPadrao:
       'Você é advogado(a) trabalhista especialista em jornada de trabalho. Redija o bloco de jornada seguindo o micropadrão: fato → artigo da CLT + Súmula do TST + cláusula da CCT → impugnação (Súmula 338) → pedido com reflexos.',
   },
@@ -192,11 +213,12 @@ export async function redigirTesesIA({ caso, calculos, dadosCct, dados, onTool }
   const tarefas = ativos.map((e) => {
     const cfg = cfgPorNumero.get(e.numero);
     const promptSistema = cfg?.prompt_sistema || e.promptPadrao;
+    const instrucao = typeof e.instrucao === 'function' ? e.instrucao(d, c) : e.instrucao;
     properties[e.campo] = {
       type: 'string',
-      description: `Capítulo: ${e.nome}. ${e.instrucao} Papel: ${promptSistema}`,
+      description: `Capítulo: ${e.nome}. ${instrucao} Papel: ${promptSistema}`,
     };
-    return `### ${e.campo} — ${e.nome}\nPapel: ${promptSistema}\nTarefa: ${e.instrucao}`;
+    return `### ${e.campo} — ${e.nome}\nPapel: ${promptSistema}\nTarefa: ${instrucao}`;
   });
 
   notify(`Redigindo ${ativos.length} capítulo(s) em análise única (uma chamada à IA)...`);

@@ -236,6 +236,21 @@ export function calcularVerbasCaso(caso = {}) {
     itens.push({ item: 'Multa do art. 467 da CLT', memoria: '50% sobre saldo + aviso prévio + 13º + férias +1/3 (verbas incontroversas)', valor: round2(baseIncontroversa * 0.5) });
   }
 
+  // Multa do art. 477 da CLT — 1 salário nominal (§§ 6º e 8º), devida quando
+  // as verbas rescisórias não são pagas no prazo. Presume-se na rescisão não
+  // quitada (todas as petições de referência a pedem).
+  if (ap && salario) {
+    itens.push({ item: 'Multa do art. 477 da CLT', memoria: '1 salário nominal (art. 477, §§ 6º e 8º, CLT)', valor: round2(salario) });
+  }
+
+  // Salários em aberto — meses não quitados × salário (nº de meses informado)
+  if (caso.tem_salarios_aberto && salario) {
+    const qtd = Number(caso.salarios_aberto_qtd);
+    if (qtd > 0) {
+      itens.push({ item: 'Salários em aberto', memoria: `${qtd} mês(es) não quitado(s) × ${formatBRL(salario)}`, valor: round2(salario * qtd) });
+    }
+  }
+
   const fg = fgtsPeriodo(salario, mesesProjetados, { multaPct: isAcordo ? 0.2 : 0.4 });
   if (fg) {
     itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${mesesProjetados} meses (proj. aviso prévio)`, valor: fg.deposito });
@@ -293,10 +308,16 @@ export function calcularVerbasCaso(caso = {}) {
     itens.push({ item: 'Auxílio-alimentação nas folgas', memoria: `${formatBRL(va)}/dia × ${folgasMes}/mês × ${meses} meses`, valor: round2(va * folgasMes * meses) });
   }
 
-  // Vale-transporte nas folgas — 2 conduções/dia × valor × folgas/mês × meses
-  if (caso.tem_vale_transporte && caso.val_conducao && folgasMes && meses) {
-    const vc = Number(caso.val_conducao);
-    itens.push({ item: 'Vale-transporte nas folgas', memoria: `2 conduções × ${formatBRL(vc)} × ${folgasMes}/mês × ${meses} meses`, valor: round2(2 * vc * folgasMes * meses) });
+  // Vale-transporte nas folgas — 2 conduções/dia × valor × folgas/mês × meses.
+  // Fallback determinístico: quando o valor não for informado na entrevista,
+  // adota-se R$ 5,00 por condução (R$ 10,00/dia) — padrão do escritório.
+  if (caso.tem_vale_transporte && folgasMes && meses) {
+    const vc = Number(caso.val_conducao) || 5;
+    const usouPadrao = !caso.val_conducao;
+    const memoria = usouPadrao
+      ? `2 conduções × R$ 5,00 (padrão — valor não informado) × ${folgasMes}/mês × ${meses} meses`
+      : `2 conduções × ${formatBRL(vc)} × ${folgasMes}/mês × ${meses} meses`;
+    itens.push({ item: 'Vale-transporte nas folgas', memoria, valor: round2(2 * vc * folgasMes * meses) });
   }
 
   return itens;

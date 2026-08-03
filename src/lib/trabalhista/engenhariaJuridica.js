@@ -38,10 +38,10 @@ E) CÁLCULO E ROL DE PEDIDOS:
 - O valor da causa deve ser exatamente a soma dos itens do rol de pedidos.
 - Honorários sucumbenciais: 15% de forma uniforme no tópico, no rol e no fecho.
 
-G) TRAVAS ADICIONAIS (verificação final antes de entregar):
+F) TRAVAS ADICIONAIS (verificação final antes de entregar):
 - AVISO PRÉVIO: em dispensa sem justa causa com data de saída definida, o aviso prévio é INDENIZADO (Lei 12.506/11). É PROIBIDO afirmar que o reclamante "cumpriu aviso prévio trabalhado" ou pedir a redução de 2 horas diárias quando a dispensa foi imotivada e imediata.
-- VALE-TRANSPORTE: quando o valor não for informado na entrevista, adote o padrão de R$ 10,00 por dia (duas conduções de R$ 5,00) e explicite essa base de cálculo.
+- VALE-TRANSPORTE: o valor é calculado por código — quando não informado na entrevista, adota-se o padrão de R$ 10,00 por dia (duas conduções de R$ 5,00). A IA não calcula nem precisa mencionar a base de cálculo.
 
-F) ENTREGA:
+G) ENTREGA:
 - Comece direto em "AO MM. JUÍZO DA VARA DO TRABALHO DE ...". Sem comentários, introduções ou narração de etapas.
 - Garanta a concordância de gênero em todo o texto conforme o reclamante — EXCEÇÃO: a expressão "por seu advogado constituído" refere-se ao Dr. Fernando Andrade Vieira (sempre homem). Use SEMPRE "seu advogado" (masculino), mesmo quando a reclamante for mulher — NUNCA escreva "sua advogada".`;
