@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Loader2, Upload, Library, CheckCircle2, AlertCircle, FileText, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Loader2, Upload, Download, Library, CheckCircle2, AlertCircle, FileText, SlidersHorizontal } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { extrairTextoDocx, classificarTextoModelo, resumirDiferencial } from '@/lib/trabalhista/modelosReferencia';
 import { invalidateRuntimeCache } from '@/lib/trabalhista/runtimeCache';
+import { baixarTemplateCorrigido } from '@/lib/trabalhista/gerarTemplateCorrigido';
 
 const RITO_LABEL = { ordinario: 'Ordinário', sumarissimo: 'Sumaríssimo' };
 
@@ -18,6 +19,7 @@ export default function ModelosReferencia() {
   const [msg, setMsg] = useState(null);
   const [erro, setErro] = useState(null);
   const [config, setConfig] = useState(null);
+  const [corrigindo, setCorrigindo] = useState(false);
 
   const load = () =>
     Promise.all([
@@ -55,6 +57,28 @@ export default function ModelosReferencia() {
     setConfig({ ...atual, ...patch });
     await base44.entities.IntegracaoConfig.update(atual.id, patch);
     invalidateRuntimeCache('config-integracoes'); // muda a geração na hora (sem esperar o TTL)
+  };
+
+  const baixarCorrigido = async () => {
+    if (!config?.template_docx_url) return;
+    setCorrigindo(true);
+    setErro(null);
+    setMsg(null);
+    try {
+      const r = await baixarTemplateCorrigido(config.template_docx_url, 'MODELO_PRINCIPAL_template_corrigido.docx');
+      const itens = [
+        r.saldoAdicionado && 'saldo de salário',
+        r.multa467Adicionada && 'multa art. 467',
+        r.multa477Adicionada && 'multa art. 477',
+        r.salariosAbertoAdicionado && 'salários em aberto',
+      ].filter(Boolean);
+      setMsg(`Template corrigido baixado${itens.length ? ` (adicionado: ${itens.join(', ')})` : ' — já estava atualizado'}. Envie-o em “Trocar template” para torná-lo oficial.`);
+    } catch (err) {
+      console.error(err);
+      setErro(`Erro ao gerar o template corrigido: ${err?.message || err}`);
+    } finally {
+      setCorrigindo(false);
+    }
   };
 
   const handleTemplateUpload = async (e) => {
@@ -258,6 +282,17 @@ export default function ModelosReferencia() {
               <label htmlFor="tmpl-docx" className="flex items-center gap-2 px-4 py-2 border border-[#1a73e8] text-[#1a73e8] rounded-lg text-sm font-medium hover:bg-[#e8f0fe] cursor-pointer">
                 <Upload className="w-4 h-4" /> {config.template_docx_url ? 'Trocar template' : 'Enviar template'}
               </label>
+              {config.template_docx_url && (
+                <button
+                  onClick={baixarCorrigido}
+                  disabled={corrigindo}
+                  className="flex items-center gap-2 px-4 py-2 border border-[#0b8043] text-[#0b8043] rounded-lg text-sm font-medium hover:bg-[#e6f4ea] transition-colors disabled:opacity-50"
+                  title="Baixa uma cópia do template com as verbas faltantes no rol de pedidos (saldo de salário, multas 467/477 e salários em aberto)"
+                >
+                  {corrigindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  {corrigindo ? 'Gerando...' : 'Baixar corrigido'}
+                </button>
+              )}
               {config.template_docx_url ? (
                 <span className="text-xs text-green-700 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> {config.template_docx_nome || 'template enviado'}</span>
               ) : (
