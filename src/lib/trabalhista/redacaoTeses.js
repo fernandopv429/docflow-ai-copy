@@ -1,6 +1,8 @@
 import { base44 } from '@/api/base44Client';
 import { invokeLLMComRetry } from './llmRetry';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
+import { BLOCO_REGRAS_QUALIDADE } from './regrasQualidadeFav';
+import { BLOCO_MATRIZ_TOPICOS } from './matrizTopicos';
 import { blocoRegrasCriticas } from './regrasCriticas';
 import { formatBRL } from './mathUtils';
 
@@ -188,6 +190,8 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
   return [
     'CONTEXTO COMPLETO DO CASO (leia tudo; você escreverá TODOS os capítulos ativos em uma única resposta JSON).',
     BLOCO_ENGENHARIA_JURIDICA,
+    BLOCO_REGRAS_QUALIDADE,
+    BLOCO_MATRIZ_TOPICOS,
     blocoRegrasCriticas({ municipios: municipiosDoCaso(caso) }),
     '',
     'REGRAS DE SEGURANÇA (obrigatórias):',
