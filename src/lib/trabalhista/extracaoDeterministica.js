@@ -34,6 +34,8 @@ function matchAny(texto, padroes) {
   return undefined;
 }
 
+const ESTADOS_CIVIS = /^(solteir[oa]|casad[oa]?|divorciad[oa]|separad[oa]|vi[úu]v[oa]?|un[ií]ão\s+est[áa]vel)$/i;
+
 export function extrairDeterministico(texto) {
   if (!texto || !texto.trim()) return {};
   const t = texto;
@@ -83,12 +85,18 @@ export function extrairDeterministico(texto) {
   const end = matchAny(t, /(?:residente|domiciliad[oa])\s+(?:e\s*domiciliad[oa]\s+)?n[ao]\s*(.+?)(?:CEP|,\s*com\s*correio)/i);
   if (end) caso.recl_endereco = end.replace(/[,\s]+$/, '').trim();
 
-  // Função — linha "FUNÇÃO:" ou a palavra entre estado civil e "portador"
+  // Função — linha "FUNÇÃO:" ou a palavra entre estado civil e "portador".
+  // CRÍTICO: rejeita estado civil (solteiro, casado, etc.) — o segundo regex
+  // casava "solteiro" como função em "brasileiro, solteiro, portador...", pois
+  // "solteiro" está entre a vírgula e ", portador". O filtro ESTADOS_CIVIS
+  // garante que apenas cargos/profissões (ex.: AUXILIAR DE CORTADOR) sejam
+  // aceitos — senão o preâmbulo fica "solteiro, solteiro" e o dano moral diz
+  // "na função de solteiro".
   const func = matchAny(t, [
     /FUN[ÇC][ÃA]O[:\s]*\n?\s*([A-ZÀ-Ýa-zà-ÿ\s]+?)(?:\n|$)/i,
-    /,\s*([A-ZÀ-Ý]{4,}),\s*portador/i,
+    /,\s*([A-ZÀ-Ýa-zà-ÿ]{4,}),\s*portador/i,
   ]);
-  if (func) caso.funcao = func.trim();
+  if (func && !ESTADOS_CIVIS.test(func.trim())) caso.funcao = func.trim();
 
   // CNPJs — reclamadas (formato XX.XXX.XXX/XXXX-XX)
   const cnpjs = [...t.matchAll(/\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/g)].map((m) => limparDigitos(m[1])).filter((d) => d.length === 14);
@@ -131,11 +139,28 @@ export function extrairDeterministico(texto) {
   const res = matchAny(t, [/(?:Sem\s*JUSTA\s*CAUSA|Rescis[ãa]o|Dispensa)[:\s]*(\d{2}\/\d{2}\/\d{4})/i]);
   if (res) caso.data_rescisao = paraIsoData(res);
 
-  // Salário
-  const sal = matchAny(t, /Sal[áa]rio[:\s]*(?:R\$\s*)?([\d.,]+)/i);
+  // Salário — tenta múltiplos rótulos comuns em roteiros de entrevista.
+  // Sem isto, "REMUNERAÇÃO: R$ 2.148,22" ou "Salário: 2148,22" sem "R$"
+  // não eram capturados → TODOS os cálculos rescisórios ficavam zerados.
+  const sal = matchAny(t, [
+    /Sal[áa]rio[:\s]*(?:R\$\s*)?([\d.,]+)/i,
+    /Remunera[çc][ãa]o[:\s]*(?:mensal\s*)?(?:R\$\s*)?([\d.,]+)/i,
+    /Sal[áa]rio\s+(?:base|contratual)[:\s]*(?:R\$\s*)?([\d.,]+)/i,
+    /[ÚU]ltimo\s+sal[áa]rio[:\s]*(?:R\$\s*)?([\d.,]+)/i,
+  ]);
   if (sal) {
     const n = comoNumero(sal);
     if (n != null) caso.salario = n;
+  }
+
+  // Maior remuneração (base do dano moral 10x) — se não informada, usa salário
+  const maiorRem = matchAny(t, [
+    /Maior\s+remunera[çc][ãa]o[:\s]*(?:R\$\s*)?([\d.,]+)/i,
+    /Maior\s+sal[áa]rio[:\s]*(?:R\$\s*)?([\d.,]+)/i,
+  ]);
+  if (maiorRem) {
+    const n = comoNumero(maiorRem);
+    if (n != null) caso.maior_remuneracao = n;
   }
 
   // Jornada / escala — captura a linha completa da jornada; escala separada
@@ -206,9 +231,10 @@ export function extrairDeterministico(texto) {
   // Gratificação de função (bnus de meta/bonificao) — valor fixo mensal
   if (/gratifica[çc][ãa]o/i.test(t)) {
     caso.tem_gratificacao = true;
-    const gratVal = matchAny(t, /GRATIFICA[ÇC][ÃA]O[:\s]*R\$\s*([\d.,]+)/i);
-    if (gratVal) {
-      const v = comoNumero(gratVal);
+    // Gratificação: aceita texto entre o rótulo e o valor (ex.: "Bônus de meta de aproximadamente R$ 125,00")
+    const gratMatch = /GRATIFICA[ÇC][ÃA]O[\s\S]{0,60}?R\$\s*([\d.,]+)/i.exec(t);
+    if (gratMatch) {
+      const v = comoNumero(gratMatch[1]);
       if (v != null && v > 0) caso.gratificacao_valor = v;
     }
   }

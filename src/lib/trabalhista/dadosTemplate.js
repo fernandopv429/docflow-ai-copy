@@ -28,6 +28,7 @@ const CALC_CAMPO = {
   'Auxílio-alimentação nas folgas': 'VALOR_AUX_ALIM_TOTAL',
   'Vale-transporte nas folgas': 'VALOR_VT_TOTAL',
   'Gratificação de função (10%)': 'VALOR_GRATIFICACAO',
+  'Gratificação/bônus de função': 'VALOR_GRATIFICACAO',
   'Desvio de função (50%)': 'VALOR_DESVIO',
   'Multa do art. 477 da CLT': 'VALOR_MULTA_477',
   'Salários em aberto': 'VALOR_SALARIOS_ABERTO',

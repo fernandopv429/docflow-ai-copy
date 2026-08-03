@@ -297,6 +297,7 @@ DADOS BÁSICOS:
 - CPF/CNPJ/PIS somente números.
 - recl_serie: número de série da CTPS ("serie: 25795" → "25795"). recl_ctps: só o número da CTPS (sem série).
 - recl_genero: 'M' ou 'F' inferido do nome ("brasileiro/solteiro" → 'M').
+- FUNÇÃO (CRÍTICO): o campo "funcao" é o CARGO/PROFISSÃO do reclamante (ex.: AUXILIAR DE CORTADOR, VIGILANTE, PORTEIRO, CONTROLADOR DE ACESSO). NUNCA use estado civil (solteiro, casado, divorciado, viúvo) como função. Em "brasileiro, solteiro, AUXILIAR DE CORTADOR, portador...", a função é "AUXILIAR DE CORTADOR" — NUNCA "solteiro". Se não houver cargo explícito, omita o campo em vez de preencher com estado civil.
 - recl_email: e-mail PESSOAL do reclamante. Extraia SEMPRE que houver qualquer e-mail na entrevista, mesmo sem rótulo (varredura completa), em qualquer seção do roteiro. Exclua o domínio do escritório (@favadvogados.com.br / juridico@...). NUNCA deixe em branco se houver e-mail pessoal (gmail/hotmail/outlook/yahoo etc.).
 
 MUNICÍPIO/GRAFIA:
@@ -311,9 +312,12 @@ MULTA CONVENCIONAL:
 AUXÍLIO-ALIMENTAÇÃO:
 - valor_aux_alimentacao: valor DIÁRIO unitário estipulado pela CCT (ex.: R$ 25,00/dia → 25.0). Extraia mesmo se não mencionado explicitamente quando há CCT conhecida e folgas trabalhadas.
 
-SALÁRIO:
-- Extraia o salário mesmo que venha como "Salário: 2148,22" ou "R$ 2.148,22".
+SALÁRIO (CRÍTICO — sem salário, TODOS os cálculos rescisórios ficam zerados):
+- Extraia o salário mesmo que venha como "Salário: 2148,22", "R$ 2.148,22", "Remuneração: R$ 2.500,00" ou "Salário base: R$ 1.800,00".
+- Se o valor estiver em qualquer seção do roteiro (Contrato, Remuneração, Dados do contrato), extraia SEMPRE.
+- maior_remuneracao: se a entrevista mencionar "maior remuneração" ou um valor diferente do salário base, extraia-o; senão, o sistema usa o salário.
 - Se não informado explicitamente MAS a função é vigilante e há CCT conhecida, NÃO invente — deixe em branco.
+- GRATIFICAÇÃO: se houver "Gratificação: R$ 125,00" ou "Bônus de meta: R$ 125,00", extraia gratificacao_valor = 125.0 E marque tem_gratificacao = true.
 
 FOLGAS TRABALHADAS (FT):
 - "5 a 6 FTs" → ft_qtd_media = 5.5 (use a MÉDIA da faixa).
