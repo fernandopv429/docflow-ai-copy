@@ -121,7 +121,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
     caso.funcao = casoDet.funcao || '';
   }
   const MARC_ENTREVISTA = /\b(?:FUN[ÇC][ÃA]O|DANO\s+MORAL|DIREITOS\s+LESADOS|JORNADA|SAL[ÁA]RIO|ADMISS[ÃA]O|RESCIS[ÃA]O|CEP|CNPJ|ENDERE[ÇC]O|ESTADO\s+CIVIL|TEMPO\s+LABORADO|DESvio|AC[ÚU]MULO|FOLGAS|HORAS\s+EXTRAS|GRATIFICA[ÇC][ÃA]O)\s*[:/]/i;
-  for (const campo of ['jornada_horario', 'desvio_atividades', 'acumulo_atividades', 'local_prestacao', 'recl_endereco', 'funcao', 'escala']) {
+  for (const campo of ['jornada_horario', 'desvio_atividades', 'acumulo_atividades', 'local_prestacao', 'recl_endereco', 'funcao', 'escala', 'prorrogacao_jornada', 'intervalo_usufruido']) {
     if (caso[campo] && MARC_ENTREVISTA.test(String(caso[campo]))) {
       const det = casoDet[campo];
       caso[campo] = (det && !MARC_ENTREVISTA.test(String(det))) ? det : '';
@@ -145,6 +145,18 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   if (!caso.tipo_dispensa && attrsObj.tipo_dispensa) caso.tipo_dispensa = attrsObj.tipo_dispensa;
   if (!caso.comarca_uf && attrsObj.comarca_uf) caso.comarca_uf = attrsObj.comarca_uf;
   if (!caso.local_prestacao && attrsObj.local_prestacao) caso.local_prestacao = attrsObj.local_prestacao;
+  // Salário e maior remuneração: crítico — sem salário, TODOS os cálculos
+  // rescisórios ficam zerados. Aceita do chat (attrs) quando a entrevista
+  // não mencionou explicitamente.
+  if (!caso.salario && attrsObj.salario) caso.salario = Number(attrsObj.salario) || undefined;
+  if (!caso.maior_remuneracao && attrsObj.maior_remuneracao) caso.maior_remuneracao = Number(attrsObj.maior_remuneracao) || undefined;
+  if (!caso.salario && attrsObj.salario_texto) {
+    const m = /R\$\s*([\d.,]+)/i.exec(String(attrsObj.salario_texto));
+    if (m) {
+      const v = parseFloat(m[1].replace(/\.(?=\d{3}\b)/g, '').replace(',', '.'));
+      if (Number.isFinite(v) && v > 0) caso.salario = v;
+    }
+  }
   const attrsCnpjs = (attrsObj.cnpjs || []).map((c) => String(c).replace(/\D/g, '')).filter((d) => d.length === 14);
   if (!caso.recl1_cnpj && attrsCnpjs[0]) caso.recl1_cnpj = attrsCnpjs[0];
   if (!caso.recl2_cnpj && attrsCnpjs[1]) caso.recl2_cnpj = attrsCnpjs[1];

@@ -36,6 +36,14 @@ function matchAny(texto, padroes) {
 
 const ESTADOS_CIVIS = /^(solteir[oa]|casad[oa]?|divorciad[oa]|separad[oa]|vi[úu]v[oa]?|un[ií]ão\s+est[áa]vel)$/i;
 
+// Rótulos de entrevista separados por espaços (não newlines). Sem isto, regexes
+// que capturam [^\n]+ engolem rótulos subsequentes (ex.: "Jornada: 5x2 ... HORAS
+// EXTRAS: ... GRATIFICAÇÃO: ..."), vazando texto bruto da entrevista no template.
+const ROTULOS = /\s+(?:Admiss|Jornada|Sal[áa]|Remunera|DANO|GRATIFICA|AC[ÚU]MULO|HORAS|RESUMO|TEMPO|Sem\s+JUSTA|RESOLU|ENDERE|CEP|CNPJ|DATA|INTERVALO|INTRA|PERICUL|INSALUB|RITO|COMARCA|RECLAMAD|FOLGAS|VALE|AUX[ÍI]LIO|PIS|CTPS|RG\b|CPF|NASC|FILIA|RESID|DOMICIL|ESCALA|INTRAJORNADA|FUN[ÇC][ÃA]O|DIREITOS|ESTADO\s+CIVIL|NACIONALIDADE|TIPO|RESOLU|S[ée]rie)/i;
+function cortarAteRotulo(texto) {
+  return String(texto || '').split(ROTULOS)[0].replace(/[.,;\s]+$/, '').trim();
+}
+
 export function extrairDeterministico(texto) {
   if (!texto || !texto.trim()) return {};
   const t = texto;
@@ -85,18 +93,21 @@ export function extrairDeterministico(texto) {
   const end = matchAny(t, /(?:residente|domiciliad[oa])\s+(?:e\s*domiciliad[oa]\s+)?n[ao]\s*(.+?)(?:CEP|,\s*com\s*correio)/i);
   if (end) caso.recl_endereco = end.replace(/[,\s]+$/, '').trim();
 
-  // Função — linha "FUNÇÃO:" ou a palavra entre estado civil e "portador".
-  // CRÍTICO: rejeita estado civil (solteiro, casado, etc.) — o segundo regex
-  // casava "solteiro" como função em "brasileiro, solteiro, portador...", pois
-  // "solteiro" está entre a vírgula e ", portador". O filtro ESTADOS_CIVIS
-  // garante que apenas cargos/profissões (ex.: AUXILIAR DE CORTADOR) sejam
-  // aceitos — senão o preâmbulo fica "solteiro, solteiro" e o dano moral diz
-  // "na função de solteiro".
-  const func = matchAny(t, [
-    /FUN[ÇC][ÃA]O[:\s]*\n?\s*([A-ZÀ-Ýa-zà-ÿ\s]+?)(?:\n|$)/i,
-    /,\s*([A-ZÀ-Ýa-zà-ÿ]{4,}),\s*portador/i,
-  ]);
-  if (func && !ESTADOS_CIVIS.test(func.trim())) caso.funcao = func.trim();
+  // Função — texto após "FUNÇÃO:" até o próximo rótulo (Admissão:, Jornada:,
+  // etc.). O regex anterior usava [A-ZÀ-Ýa-zà-ÿ\s]+ até \n, mas a entrevista
+  // tem rótulos separados por ESPAÇOS, não newlines — então "FUNÇÃO: AUXILIAR
+  // DE CORTADOR Admissão: 10/05/2023" não casava (o ":" de "Admissão:" não é
+  // letra) e a função ficava vazia ([FUNÇÃO] no template). Agora captura [^\n]+
+  // e corta no próximo rótulo.
+  const funcMatch = /FUN[ÇC][ÃA]O[:\s]*([^\n]+)/i.exec(t);
+  if (funcMatch) {
+    const funcText = cortarAteRotulo(funcMatch[1]);
+    if (funcText && !ESTADOS_CIVIS.test(funcText)) caso.funcao = funcText;
+  }
+  if (!caso.funcao) {
+    const func2 = matchAny(t, /,\s*([A-ZÀ-Ýa-zà-ÿ]{4,}),\s*portador/i);
+    if (func2 && !ESTADOS_CIVIS.test(func2.trim())) caso.funcao = func2.trim();
+  }
 
   // CNPJs — reclamadas (formato XX.XXX.XXX/XXXX-XX)
   const cnpjs = [...t.matchAll(/\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/g)].map((m) => limparDigitos(m[1])).filter((d) => d.length === 14);
@@ -105,9 +116,9 @@ export function extrairDeterministico(texto) {
 
   // Nomes das reclamadas — após "1ª RECLAMADA:" / "2ª RECLAMADA:" até "CNPJ"
   const r1 = matchAny(t, /1[ªa]\s*RECLAMADA[:\s]*\n?\s*(.+?)(?:CNPJ|$)/i);
-  if (r1) caso.recl1_nome = r1.trim();
+  if (r1) caso.recl1_nome = r1.split(/,\s*devidamente/i)[0].trim();
   const r2 = matchAny(t, /2[ªa]\s*RECLAMADA[:\s]*\n?\s*(.+?)(?:CNPJ|$)/i);
-  if (r2) caso.recl2_nome = r2.trim();
+  if (r2) caso.recl2_nome = r2.split(/,\s*devidamente/i)[0].trim();
 
   // Endereços das reclamadas (após "ENDEREÇO:") — 1ª e 2ª ocorrência.
   // Essencial p/ a competência: sem o endereço da tomadora (recl2), o template
@@ -163,19 +174,20 @@ export function extrairDeterministico(texto) {
     if (n != null) caso.maior_remuneracao = n;
   }
 
-  // Jornada / escala — captura a linha completa da jornada; escala separada
-  const jornada = matchAny(t, /Jornada[:\s]*([^\n]+)/i);
-  if (jornada) caso.jornada_horario = jornada.trim();
+  // Jornada / escala — captura até o próximo rótulo (ex.: HORAS EXTRAS:)
+  const jornadaMatch = /Jornada[:\s]*([^\n]+)/i.exec(t);
+  if (jornadaMatch) caso.jornada_horario = cortarAteRotulo(jornadaMatch[1]);
   const escalaMatch = matchAny(t, /(\d+\s*x\s*\d+)/i);
   if (escalaMatch) caso.escala = escalaMatch.replace(/\s+/g, '').toLowerCase();
 
   // Intervalo intrajornada
-  const intervalo = matchAny(t, /Intrajornada[:\s]*([0-9\s/àa-z]+?)(?:\n|$)/i);
-  if (intervalo) caso.intervalo_usufruido = intervalo.trim();
+  const intervaloMatch = /(?:Intrajornada|Intervalo)[:\s]*([^\n]+)/i.exec(t);
+  if (intervaloMatch) caso.intervalo_usufruido = cortarAteRotulo(intervaloMatch[1]);
 
-  // Prorrogação de jornada (horas extras antecedentes/sucedentes)
-  const he = matchAny(t, /HORAS\s+EXTRAS[:\s]*([^\n]+)/i);
-  if (he) caso.prorrogacao_jornada = he.trim();
+  // Prorrogação de jornada (horas extras antecedentes/sucedentes) — corta no
+  // próximo rótulo para não engolir "GRATIFICAÇÃO:", "ACÚMULO:" etc.
+  const heMatch = /HORAS\s+EXTRAS[:\s]*([^\n]+)/i.exec(t);
+  if (heMatch) caso.prorrogacao_jornada = cortarAteRotulo(heMatch[1]);
 
   // Folgas trabalhadas — quantidade (média da faixa) e valor
   const folgaFaixa = /FOLGAS\s*LABORADAS[:\s]*(\d+)\s*a\s*(\d+)/i.exec(t);
@@ -242,17 +254,19 @@ export function extrairDeterministico(texto) {
   // Insalubridade — ambiente insalubre, odor, EPI inadequado
   if (/insalubr/i.test(t) || /ambient[ei]\s+insalubr|odor\s+(?:de|proveniente)|EPIs?\s+inadequad/i.test(t)) {
     caso.tem_insalubridade = true;
-    const ins = matchAny(t, /(?:INSALUBRIDADE|AMBIENTE\s+INSALUBRE)[:\s]*([^\n]+)/i);
-    if (ins) caso.insalubridade_descricao = ins.trim();
+    const insMatch = /(?:INSALUBRIDADE|AMBIENTE\s+INSALUBRE)[:\s]*([^\n]+)/i.exec(t);
+    if (insMatch) caso.insalubridade_descricao = cortarAteRotulo(insMatch[1]);
     else if (/odor|EPI/i.test(t)) caso.insalubridade_descricao = 'Ambiente de trabalho insalubre com odor e sem EPIs adequados.';
   }
 
   // Vigilante -> periculosidade
   if (/vigilante|vigil[âa]ncia/i.test(caso.funcao || t)) caso.tem_periculosidade = true;
 
-  // Noturno (jornada noturna: início >= 18h ou fim <= 7h)
+  // Noturno (jornada noturna: 22h–05h). O regex anterior aceitava 0[0-7], que
+  // casava "07:00" (início do diurno) e ativava noturno indevidamente para
+  // jornadas 07:00-17:00. Agora só 22h–05h é considerado noturno.
   const horario = caso.jornada_horario || '';
-  if (/(?:1[89]|2[0-3])\s*[:h]/i.test(horario) || /0[0-7]\s*[:h]/i.test(horario)) {
+  if (/(?:2[2-3]|0[0-5])\s*[:h]/i.test(horario)) {
     caso.tem_adic_noturno = true;
   }
 
