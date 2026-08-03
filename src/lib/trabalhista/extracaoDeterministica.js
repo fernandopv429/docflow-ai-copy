@@ -101,6 +101,19 @@ export function extrairDeterministico(texto) {
   const r2 = matchAny(t, /2[ªa]\s*RECLAMADA[:\s]*\n?\s*(.+?)(?:CNPJ|$)/i);
   if (r2) caso.recl2_nome = r2.trim();
 
+  // Endereços das reclamadas (após "ENDEREÇO:") — 1ª e 2ª ocorrência.
+  // Essencial p/ a competência: sem o endereço da tomadora (recl2), o template
+  // vazava a residência do reclamante como local de prestação.
+  const endsLog = [...t.matchAll(/ENDERE[ÇC]O[:\s]*([^\n]+)/gi)].map((m) => m[1].trim());
+  if (endsLog[0]) caso.recl1_logradouro = endsLog[0];
+  if (endsLog[1]) caso.recl2_logradouro = endsLog[1];
+
+  // E-mail pessoal do reclamante (após "correio eletrônico:"), excluindo o
+  // domínio do escritório (trabalhista@favadvogados.com.br). Sem isto, a minuta
+  // dizia "O autor não possui correio eletrônico" mesmo com o e-mail na entrevista.
+  const emailMatch = /correio\s*eletr[ôo]nico[:\s]*([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i.exec(t);
+  if (emailMatch && !/favadvogados/i.test(emailMatch[1])) caso.recl_email = emailMatch[1].trim().toLowerCase();
+
   // Datas de admissão e rescisão
   const adm = matchAny(t, /Admiss[ãa]o[:\s]*(\d{2}\/\d{2}\/\d{4})/i);
   if (adm) caso.data_admissao = paraIsoData(adm);

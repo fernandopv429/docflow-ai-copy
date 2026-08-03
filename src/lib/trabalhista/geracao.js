@@ -210,6 +210,17 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
     }
   }
 
+  // Vigilância com folgas trabalhadas (pagas informalmente via PIX/dinheiro):
+  // VT e auxílio-alimentação das folgas são devidos pela CCT e não foram
+  // pagos nesses dias. Auto-trigger determinístico — evita a omissão dos
+  // pedidos de VT/VA nas folgas (erro recorrente em auditorias internas).
+  const ehVig = /vigilante|vigil/i.test(caso.funcao || '');
+  if (ehVig && caso.tem_ft) {
+    caso.tem_vale_transporte = true;
+    caso.tem_auxilio_alimentacao = true;
+    if (!caso.valor_aux_alimentacao) caso.valor_aux_alimentacao = 39; // padrão SINDEEPRES
+  }
+
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 

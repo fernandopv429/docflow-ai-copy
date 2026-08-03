@@ -148,6 +148,31 @@ function hojeExtenso() {
   return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
+// Narrativa CONCRETA do dano moral — determinística e coerente. Quando o
+// parser devolve apenas um fragmento (ex.: "direitos lesados.") ou a IA de
+// redação está desligada, constrói um parágrafo articulado a partir dos fatos
+// do caso (desvio sem contraprestação, folgas via PIX/dinheiro, etc.). A IA,
+// quando ativa, sobrescreve via BLOCO_DANO_MORAL (geracao.js).
+function narrativaDanoMoral(caso) {
+  const raw = (caso.dano_fatos || caso.dano_supervisor || '').trim();
+  if (raw.length >= 80) return raw; // narrativa real do parser — usa como está
+  const fatos = [];
+  if (caso.tem_desvio && caso.desvio_atividades) {
+    const atv = String(caso.desvio_atividades).replace(/[.\s]+$/, '').toLowerCase().slice(0, 140);
+    fatos.push(`compelido a exercer, de forma habitual, atribuições alheias à função contratada (desvio de função — ${atv}) sem qualquer contraprestação pecuniária`);
+  }
+  if (caso.tem_ft && (caso.tem_integracao_por_fora || /pix|dinheiro/i.test(raw))) {
+    fatos.push(`laborado em dias de folga mediante pagamento informal (via PIX/dinheiro), à margem da folha salarial e dos recolhimentos previdenciários`);
+  }
+  if (!fatos.length && caso.tem_integracao_por_fora) {
+    fatos.push('submetido a pagamentos por fora, sem os devidos recolhimentos previdenciários e fiscais');
+  }
+  const corpus = fatos.length
+    ? `Durante todo o pacto contratual, o reclamante foi ${fatos.join(', ')}. `
+    : (raw ? `${raw} ` : '');
+  return `${corpus}Tais condutas ilícitas da reclamada violaram a dignidade pessoal e os valores morais do autor, gerando angústia, sofrimento e indignação, a ensejar a devida reparação moral.`;
+}
+
 export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dadosReceita = [], dadosCep = [] } = {}) {
   const dados = {};
 
@@ -195,12 +220,22 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   // local_prestacao/recl2_logradouro por erro); se houver 2ª reclamada, usa o
   // endereço da tomadora vindo da Receita (r2.endereco) quando o parser não o
   // extraiu da entrevista.
+  // Rejeita a residência do reclamante por CEP (robusto a correções de
+  // grafia/acento feitas pelo parser ou ViaCEP) — a comparação por string
+  // exata falhava quando a residência vinha normalizada e vazava como local
+  // de prestação. Preferência: tomadora (recl2) > local informado > empregadora.
   const residEnd = (caso.recl_endereco || '').trim().toLowerCase();
-  const localInformado =
-    caso.local_prestacao && String(caso.local_prestacao).trim().toLowerCase() !== residEnd ? caso.local_prestacao : null;
+  const cepResid = cepDoEndereco(caso.recl_endereco);
+  const rejeitarResid = (s) => {
+    if (!s) return true;
+    if (String(s).trim().toLowerCase() === residEnd) return true;
+    const cep = cepDoEndereco(s);
+    return Boolean(cepResid && cep && cep === cepResid);
+  };
+  const localInformado = caso.local_prestacao && !rejeitarResid(caso.local_prestacao) ? caso.local_prestacao : null;
   const candLocal = [
     localInformado, caso.recl2_logradouro, (r2 && r2.endereco), caso.recl1_logradouro, (r1 && r1.endereco),
-  ].filter(Boolean).map((s) => String(s).trim()).filter((s) => s.toLowerCase() !== residEnd);
+  ].filter(Boolean).map((s) => String(s).trim()).filter((s) => !rejeitarResid(s));
   dados.LOCAL_PRESTACAO_ENDERECO = candLocal[0] || '[LOCAL DE PRESTAÇÃO]';
   dados.RITO = attrs.rito === 'sumarissimo' ? 'sumaríssimo' : 'ordinário';
 
@@ -240,7 +275,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.MOTIVO_SAIDA_RESUMIDO = MOTIVO_SAIDA[tipo] || 'foi dispensado sem justa causa';
 
   // 7) Textos livres do caso concreto (parser)
-  dados.DANO_MORAL_FATO_ESPECIFICO = caso.dano_fatos || caso.dano_supervisor || '[DESCREVER O FATO CONCRETO DO DANO MORAL]';
+  dados.DANO_MORAL_FATO_ESPECIFICO = caso.tem_dano_moral ? narrativaDanoMoral(caso) : '[DESCREVER O FATO CONCRETO DO DANO MORAL]';
 
   // 8) Jornada
   dados.JORNADA_HORARIOS = caso.jornada_horario || '[HORÁRIOS]';
