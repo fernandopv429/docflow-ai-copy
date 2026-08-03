@@ -161,6 +161,7 @@ export async function consultarCct({ pergunta, categoria, data_fato, municipio, 
 // Perguntas base (temas presentes em praticamente toda petição) + condicionais
 // (só entram quando a tese existe no caso, para trazer cláusula REAL da base).
 const CCT_PERGUNTAS_BASE = [
+  'piso salarial / salário normativo da categoria',
   'adicional noturno e hora noturna reduzida',
   'auxílio alimentação / refeição e vale-transporte',
   'multa convencional por descumprimento de cláusula',
@@ -177,7 +178,6 @@ const CCT_PERGUNTAS_CONDICIONAIS = [
   [/folga|dsr|descanso semanal|feriado/i, 'trabalho em folgas, feriados e descanso semanal remunerado'],
   [/dano moral|ass[eé]dio/i, 'garantias e direitos do trabalhador previstos na convenção'],
   [/gratifica[çc][aã]o|condutor|motorista/i, 'gratificação de função do condutor de veículo'],
-  [/sal[aá]rio normativo|piso/i, 'piso salarial / salário normativo da categoria'],
   [/assiduidade/i, 'prêmio de assiduidade e seu valor previsto em convenção'],
 ];
 
@@ -252,4 +252,44 @@ export async function enriquecerCct(caso, attrs, config, local = {}) {
       } : null,
     };
   }, { ttlMs: 30 * 60 * 1000 });
+}
+
+// ============================================================
+// Extrai o piso salarial da CCT aplicável quando o salário do
+// reclamante não foi informado na entrevista. Procura nas cláusulas
+// por menções a "piso", "salário normativo", "salário base" e
+// extrai o valor monetário. Tem fallback empírico por categoria/ano.
+// ============================================================
+const PISOS_FALLBACK = {
+  // vigilancia SP — atualizados periodicamente conforme CCT SINDESEG/SINDEEPRES
+  vigilante_2025: 2127.66,
+  vigilante_2026: 2271.74,
+  // porteiro / controlador (SINDEEPRES) SP
+  porteiro_2025: 1699.23,
+  porteiro_2026: 1805.00,
+  // asseio/conservação SP
+  asseio_2025: 1699.23,
+  asseio_2026: 1805.00,
+};
+
+export function extrairPisoCct(dadosCct, funcao = '') {
+  if (!dadosCct?.clausulas?.length) return null;
+  const PADROES_PISO = /piso\s*salarial|sal[áa]rio\s*normativo|sal[áa]rio\s*base|sal[áa]rio\s*m[íi]nimo\s*(?:da\s*categoria|convencional)/i;
+  for (const c of dadosCct.clausulas) {
+    const texto = [c.ementa, c.texto, c.conteudo, c.clausula_titulo, c.clausula_ref].filter(Boolean).join(' ');
+    if (!PADROES_PISO.test(texto)) continue;
+    // Extrai o valor: "R$ 2.271,74" ou "2.271,74" ou "2271,74"
+    const m = texto.match(/R\$\s*([\d.]+,\d{2})/i) || texto.match(/\b(\d{3,4}[\.,]\d{2})\b/);
+    if (m) {
+      const v = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
+      if (Number.isFinite(v) && v > 500 && v < 20000) return v;
+    }
+  }
+  // Fallback empírico por categoria/ano
+  const ano = dadosCct.meta?.ano_base ? String(dadosCct.meta.ano_base) : String(new Date().getFullYear());
+  const cat = dadosCct.categoria || categoriaCct({ funcao }, {});
+  const ehVig = /vigilante|vigil/i.test(funcao || '');
+  const chave = ehVig ? `vigilante_${ano}` : `${cat}_${ano}`;
+  if (PISOS_FALLBACK[chave]) return PISOS_FALLBACK[chave];
+  return null;
 }

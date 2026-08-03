@@ -29,6 +29,7 @@ import {
   consultarCct,
   perguntasCct,
   enriquecerCct,
+  extrairPisoCct,
 } from './consultas';
 
 // ============================================================
@@ -211,7 +212,7 @@ Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição com
 
 ATENÇÃO AO FORMATO DAS ENTREVISTAS: o advogado costuma escrever em lista de rótulos. A DATA DE SAÍDA aparece frequentemente rotulada pela própria modalidade da rescisão — ex.: "Sem JUSTA CAUSA: 07/12/2025", "Rescisão indireta: 10/03/2025", "Pedido de demissão: 01/02/2025". Nesses casos, a data é a DATA DE RESCISÃO e o rótulo indica o tipo_dispensa. Nunca diga que a data de rescisão está faltando quando ela aparece nesse formato. Da mesma forma, "Jornada: 12x36 18:30 as 07:30" é a jornada/escala e "Salário: 2148,22" é o salário.
 
-Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, salário, jornada e fatos essenciais. Não invente dados.
+Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, jornada e fatos essenciais. O salário NÃO é obrigatório para liberar a geração — se não for informado, o sistema adota automaticamente o piso salarial da CCT aplicável. Não invente dados.
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
 ${resumoModelos(modelos)}
@@ -295,9 +296,11 @@ function inferirAtributosEntrevista(transcript) {
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
   if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
   if (!RESCISAO_RE.test(texto)) faltando.push('Data de rescisão/demissão');
-  if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário');
+  if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário (se não informar, será adotado o piso da CCT)');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
-  const essenciais = !faltando.length;
+  // Salário não bloqueia a geração — o piso salarial da CCT é usado como fallback.
+  const bloqueantes = faltando.filter((f) => !f.startsWith('Salário'));
+  const essenciais = !bloqueantes.length;
   return {
     atributos,
     essenciais,
@@ -704,6 +707,15 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
     }).catch(() => null);
     if (dadosCct?.perguntas?.length) notify(`Temas buscados na base de CCT: ${dadosCct.perguntas.join('; ')}`);
     if (dadosCct?.meta?.titulo) notify(`CCT aplicável: ${dadosCct.meta.titulo}`);
+  }
+
+  // Piso salarial da CCT como fallback quando o salário não foi informado
+  if (!caso.salario && dadosCct) {
+    const piso = extrairPisoCct(dadosCct, caso.funcao);
+    if (piso) {
+      caso.salario = piso;
+      notify(`Salário não informado — adotando piso da CCT (${dadosCct.meta?.titulo || 'categoria'}): R$ ${piso.toFixed(2).replace('.', ',')}.`);
+    }
   }
 
   // Cálculo 100% determinístico (a IA não faz aritmética).

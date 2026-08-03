@@ -36,6 +36,7 @@ import {
   enriquecerDatajud,
   montarTermosDatajud,
   enriquecerCct,
+  extrairPisoCct,
 } from './consultas';
 
 // ============================================================
@@ -248,6 +249,15 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
           notify(`Cláusula da multa convencional obtida da CCT: ${clausulaMulta.clausula_ref}`);
         }
       }
+    }
+  }
+
+  // Piso salarial da CCT como fallback quando o salário não foi informado
+  if (!caso.salario && dadosCct) {
+    const piso = extrairPisoCct(dadosCct, caso.funcao);
+    if (piso) {
+      caso.salario = piso;
+      notify(`Salário não informado na entrevista — adotando piso salarial da CCT (${dadosCct.meta?.titulo || 'categoria'}): R$ ${piso.toFixed(2).replace('.', ',')}.`);
     }
   }
 
