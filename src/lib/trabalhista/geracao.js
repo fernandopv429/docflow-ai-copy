@@ -6,6 +6,7 @@ import { extrairCasoDeTexto } from './parserEntrevista';
 import { extrairDeterministico } from './extracaoDeterministica';
 import { calcularVerbasCaso } from './mathUtils';
 import { montarDadosTemplate } from './dadosTemplate';
+import { redigirTesesIA } from './redacaoTeses';
 import { listarModelosAtivos, rankearModelos } from './matching';
 
 // Extrai texto puro de arquivos .docx anexados como entrevista.
@@ -43,7 +44,7 @@ import {
 // o template (.docx) e o preview. A IA NÃO gera documento —
 // apenas extrai dados e os poucos trechos livres do caso (parser).
 // ============================================================
-export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
+export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA = false } = {}) {
   const notify = (msg) => {
     try {
       onTool?.(msg);
@@ -227,6 +228,19 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool } = {}) {
 
   // Fonte única de dados para preview e exportação (.docx).
   const dados = montarDadosTemplate({ caso, calculos, attrs, dadosReceita: dadosReceitaFinal, dadosCep: dadosCepFinal });
+
+  // Redação por especialistas de IA (opcional). O núcleo determinístico acima
+  // NÃO é afetado: os blocos {{BLOCO_*}} argumentativos são preenchidos por IA,
+  // enquanto qualificação, valores e fecho seguem determinísticos.
+  if (redigirIA) {
+    try {
+      const { blocos, especialistasUsados } = await redigirTesesIA({ caso, calculos, dadosCct, dados, onTool });
+      Object.assign(dados, blocos);
+      if (especialistasUsados?.length) notify(`Capítulos redigidos por IA: ${especialistasUsados.join(', ')}.`);
+    } catch (e) {
+      notify(`Falha na redação por IA (a peça segue com o texto-padrão do template): ${e.message}`);
+    }
+  }
 
   return {
     dados,
