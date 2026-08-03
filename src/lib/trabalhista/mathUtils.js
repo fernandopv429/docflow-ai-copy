@@ -333,5 +333,14 @@ export function calcularVerbasCaso(caso = {}) {
     itens.push({ item: 'Vale-transporte nas folgas', memoria, valor: round2(2 * vc * folgasMes * meses) });
   }
 
+  // Honorários advocatícios sucumbenciais — 15% sobre o valor da causa (art.
+  // 85 do CPC), integrantes do valor da causa perante o art. 292, I, do CPC.
+  // Cálculo determinístico (a IA não o faz); deve figurar de forma uniforme no
+  // tópico, no rol de pedidos e no fecho, conforme diretriz do escritório.
+  const somaVerbas = round2(itens.reduce((s, c) => s + (Number(c.valor) || 0), 0));
+  if (somaVerbas > 0) {
+    itens.push({ item: 'Honorários advocatícios (15%)', memoria: '15% sobre o valor da causa (art. 85 do CPC)', valor: round2(somaVerbas * 0.15) });
+  }
+
   return itens;
 }

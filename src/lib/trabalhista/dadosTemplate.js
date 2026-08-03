@@ -31,6 +31,7 @@ const CALC_CAMPO = {
   'Desvio de função (50%)': 'VALOR_DESVIO',
   'Multa do art. 477 da CLT': 'VALOR_MULTA_477',
   'Salários em aberto': 'VALOR_SALARIOS_ABERTO',
+  'Honorários advocatícios (15%)': 'VALOR_HONORARIOS',
 };
 
 // Contrato de tags do .docx (documentação viva).
@@ -50,7 +51,7 @@ export const CAMPOS_TEMPLATE = [
   'VALOR_SALDO_SALARIO', 'VALOR_MULTA_467',
   'VALOR_AVISO_PREVIO', 'VALOR_13', 'VALOR_FERIAS', 'VALOR_FGTS', 'VALOR_MULTA_40',
   'VALOR_FT', 'VALOR_DSR', 'VALOR_DANO_MORAL_10X', 'VALOR_CAUSA_TOTAL', 'DATA_PECA',
-  'VALOR_MULTA_477', 'VALOR_SALARIOS_ABERTO',
+  'VALOR_MULTA_477', 'VALOR_SALARIOS_ABERTO', 'VALOR_HONORARIOS',
 ];
 
 export const FLAGS_TEMPLATE = [
@@ -189,12 +190,18 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   const local = localPrestacao(caso, dadosCep);
   dados.VARA_CIDADE_REGIAO = montarVaraCidadeRegiao(caso, local) || '[VARA / CIDADE / REGIÃO]';
   // LOCAL DE PRESTAÇÃO: nunca o endereço residencial do reclamante. Preferência:
-  // tomadora (recl2) > local informado > empregadora (recl1/receita).
-  const residEnd = (caso.recl_endereco || '').trim();
+  // tomadora (recl2) > local informado > empregadora (recl1/receita). Rejeita o
+  // endereço residencial em qualquer posição (o parser pode tê-lo gravado em
+  // local_prestacao/recl2_logradouro por erro); se houver 2ª reclamada, usa o
+  // endereço da tomadora vindo da Receita (r2.endereco) quando o parser não o
+  // extraiu da entrevista.
+  const residEnd = (caso.recl_endereco || '').trim().toLowerCase();
   const localInformado =
-    caso.local_prestacao && String(caso.local_prestacao).trim() !== residEnd ? caso.local_prestacao : null;
-  dados.LOCAL_PRESTACAO_ENDERECO =
-    localInformado || caso.recl2_logradouro || caso.recl1_logradouro || (r1 && r1.endereco) || '[LOCAL DE PRESTAÇÃO]';
+    caso.local_prestacao && String(caso.local_prestacao).trim().toLowerCase() !== residEnd ? caso.local_prestacao : null;
+  const candLocal = [
+    localInformado, caso.recl2_logradouro, (r2 && r2.endereco), caso.recl1_logradouro, (r1 && r1.endereco),
+  ].filter(Boolean).map((s) => String(s).trim()).filter((s) => s.toLowerCase() !== residEnd);
+  dados.LOCAL_PRESTACAO_ENDERECO = candLocal[0] || '[LOCAL DE PRESTAÇÃO]';
   dados.RITO = attrs.rito === 'sumarissimo' ? 'sumaríssimo' : 'ordinário';
 
   // 4) Reclamante
@@ -258,7 +265,10 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   // 10) CCT
   dados.CCT_ANO = caso.cct_ano || '';
   dados.CCT_CLAUSULAS = caso.cct_clausulas || '';
-  dados.CCT_CLAUSULA_MULTA = caso.cct_clausula_multa || '';
+  // Cláusula da multa convencional: se não extraída (nem obtida da CCT), deixa
+  // undefined para o nullGetter exibir [A PREENCHER: CCT_CLAUSULA_MULTA] —
+  // nunca renderizar o número em branco no meio da frase.
+  dados.CCT_CLAUSULA_MULTA = caso.cct_clausula_multa || undefined;
 
   // 11) Verbas rescisórias — períodos
   dados.PERIODO_FERIAS_PROP = caso.periodo_ferias_prop || '';

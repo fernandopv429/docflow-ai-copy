@@ -199,6 +199,11 @@ export function preencherDocxTemplate(arrayBuffer, dados) {
   if (xmlFile) {
     let xml = xmlFile.asText();
     xml = substituirColchetesNoXml(xml, dados);
+    // E-mail do reclamante ausente → redação padrão do escritório (evita o
+    // placeholder vazio ": ," na seção do Juízo 100% Digital).
+    if (!dados?.RECL_EMAIL) {
+      xml = substituirFraseTagTolerant(xml, 'O autor possui endereço de e-mail pessoal: {{RECL_EMAIL}}', 'O autor não possui correio eletrônico');
+    }
     zip.file(alvoXml, xml);
   }
 

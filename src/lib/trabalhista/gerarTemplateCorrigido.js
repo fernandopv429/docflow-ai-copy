@@ -60,7 +60,7 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
   if (xml.includes('O autor n\u00e3o possui correio eletr\u00f4nico')) {
     xml = xml.replace(
       'O autor n\u00e3o possui correio eletr\u00f4nico',
-      'O autor possui endere\u00e7o de e-mail pessoal: {{RECL_EMAIL}}'
+      '{{#RECL_EMAIL}}O autor possui endere\u00e7o de e-mail pessoal: {{RECL_EMAIL}}{{/RECL_EMAIL}}{{^RECL_EMAIL}}O autor n\u00e3o possui correio eletr\u00f4nico{{/RECL_EMAIL}}'
     );
   }
 
