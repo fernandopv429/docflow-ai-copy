@@ -53,17 +53,18 @@ export const ESPECIALISTAS = [
     nome: 'Jornada e horas extras',
     campo: 'BLOCO_JORNADA',
     ativo: (d, c) => !!(d.escala_12x36 || d.escala_4x2 || c.jornada_horario || d.folgas_trabalhadas),
-    // Escopo (adaptado do app de referência, caminho conservador): a IA redige
-    // APENAS a narrativa fática da seção "DA JORNADA DE TRABALHO". A
-    // descaracterização da escala (12x36/4x2, com ementas reais do TST), o art.
-    // 71, o adicional noturno, os 10 minutos, a periculosidade e o DSR permanecem
-    // DETERMINÍSTICOS no template (seções condicionais próprias) — não são
+    // Escopo: a IA redige o capítulo COMPLETO de jornada e horas extras
+    // (narrativa fática + fundamentação legal + jurisprudência + pedido com
+    // reflexos), em prosa argumentativa articulada — não apenas a narrativa
+    // fática. A descaracterização da escala (12x36/4x2), o art. 71, o adicional
+    // noturno, os 10 minutos, a periculosidade e o DSR autônomo permanecem
+    // DETERMINÍSTICOS no template (seções {{#flag}} próprias) — não são
     // reescritos pela IA, para preservar os precedentes verificados e as travas
     // de categoria.
     instrucao:
-      'Escreva APENAS a narrativa fática da seção "DA JORNADA DE TRABALHO": descreva, com base nos dados do caso, o horário e a escala efetivamente cumpridos, a prorrogação/extrapolação habitual da jornada e a ausência de contraprestação, em prosa jurídica fluida. Contextualize também, de forma sucinta, o pedido de diferenças de horas extras excedentes da 8ª diária e 44ª semanal (com o adicional convencional real da CCT; nunca presuma percentual — na falta, use [adicional conforme CCT]). NÃO escreva a descaracterização da escala (12x36/4x2), o art. 71 (intervalo), o adicional noturno, os 10 minutos de descanso, a periculosidade nem o DSR — essas seções são geradas deterministicamente pelo template. NÃO trate de rescisão, dano moral nem enquadramento funcional.',
+      'Escreva o capítulo COMPLETO de "DA JORNADA DE TRABALHO / DAS HORAS EXTRAS", argumentando o tópico por completo em prosa jurídica fluida e articulada (NÃO apenas frases ou palavras soltas): (1) narre, com base nos dados do caso, o horário e a escala efetivamente cumpridos (campos jornada_horario/escala), a prorrogação/extrapolação habitual da jornada e a ausência de contraprestação; (2) fundamente a tese de horas extras excedentes da 8ª diária e 44ª semanal (art. 59 da CLT; adicional convencional real da CCT — nunca presuma o percentual; na falta, use [adicional conforme CCT]; Súmula 85 do TST como fundamentação que amplia a base das horas extras quando a escala for 12x36, sem criar pedido próprio); (3) trate, quando relevante, a jurisprudência que ampara a tese; (4) conclua com o pedido de diferenças de horas extras, COM reflexos em DSR, aviso prévio, férias +1/3, 13º salário e FGTS +40% (mencionados de forma qualitativa, SEM R$). NÃO escreva a descaracterização da escala (12x36/4x2) como seção/pedido autônomo, o art. 71 (intervalo), o adicional noturno, os 10 minutos de descanso, a periculosidade nem o DSR autônomo — essas seções têm texto fixo próprio no template. NÃO trate de rescisão, dano moral nem enquadramento funcional.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em jornada de trabalho. Redija a narrativa fática da jornada em prosa jurídica fluida e natural (fatos e enquadramento inicial das horas extras), sem reproduzir a descaracterização da escala nem os demais subtópicos, que já constam do modelo.',
+      'Você é advogado(a) trabalhista especialista em jornada de trabalho e horas extras. Redija o capítulo COMPLETO da jornada e das horas extras em prosa jurídica fluida e argumentativa — narrativa fática, fundamentação legal, jurisprudência e pedido com reflexos qualitativos — sem reproduzir as seções de descaracterização da escala, art. 71, adicional noturno, 10 minutos, periculosidade e DSR autônomo, que já constam do modelo.',
   },
   {
     numero: 'dano_moral',
@@ -71,9 +72,9 @@ export const ESPECIALISTAS = [
     campo: 'BLOCO_DANO_MORAL',
     ativo: (d, c) => !!c.tem_dano_moral,
     instrucao:
-      'Escreva APENAS a narrativa CONCRETA dos fatos do dano moral — 2 a 4 frases articuladas em prosa jurídica fluida e COERENTE, sem fragmentos soltos nem frases isoladas, incorporando os abusos relatados (campos dano_fatos/dano_supervisor: nome do supervisor, perseguição, humilhação, desconto indevido de consignado, etc.). NÃO escreva a fundamentação constitucional/doutrinária (art. 5º, V/X, CF; art. 186, CC) — ela já consta do template antes deste bloco. NÃO trate de jornada, rescisão nem verbas. NÃO cite valores em R$.',
+      'Escreva o capítulo COMPLETO da narrativa dos fatos do dano moral — parágrafos articulados em prosa jurídica fluida, persuasiva e COERENTE, com o contexto completo do caso (NÃO frases isoladas nem fragmentos soltos). Narre os abusos sofridos pelo reclamante (campos dano_fatos/dano_supervisor: nome do supervisor, perseguição, humilhação, desconto indevido de consignado, etc.), o contexto em que ocorreram, a habitualidade das condutas e o impacto sobre a dignidade pessoal e a honra do autor, encadeando os fatos em uma narrativa articulada e completa. NÃO escreva a fundamentação constitucional/doutrinária (art. 5º, V/X, CF; art. 186, 927, CC) — ela já consta do template antes deste bloco. NÃO trate de jornada, rescisão nem verbas. NÃO cite valores em R$.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em dano moral. Redija APENAS a narrativa concreta dos fatos (os abusos específicos sofridos pelo reclamante), em prosa articulada e coerente — sem a fundamentação doutrinária (já presente no template) e sem valores em R$ (calculados por código).',
+      'Você é advogado(a) trabalhista especialista em dano moral. Redija o capítulo COMPLETO da narrativa dos fatos concretos do dano moral, em prosa articulada, persuasiva e coerente, com o contexto completo do caso — sem a fundamentação doutrinária (já presente no template) e sem valores em R$ (calculados por código).',
   },
   {
     numero: 'enquadramento',
@@ -101,12 +102,12 @@ export const ESPECIALISTAS = [
     campo: 'BLOCO_MULTAS_CONVENCIONAIS',
     ativo: (d, c) => !!(c.cct_ano || c.sindicato || d.periculosidade || d.assiduidade || d.folgas_trabalhadas || d.desvio_funcao || d.acumulo_funcao || d.dez_minutos_cct),
     instrucao: (d, c) =>
-      'Escreva APENAS o parágrafo de ABERTURA da seção "DAS MULTAS CONVENCIONAIS" — um parágrafo RICO e COERENTE em prosa jurídica fluida (NÃO uma frase solta nem mera troca de palavra), requerendo a aplicação da multa convencional prevista na Convenção Coletiva de Trabalho da categoria' +
+      'Escreva o capítulo COMPLETO de "DAS MULTAS CONVENCIONAIS", argumentando por completo a aplicação da multa convencional em prosa jurídica fluida e articulada (NÃO apenas o parágrafo de abertura nem uma frase solta): fundamente por que o descumprimento das obrigações convencionais pela reclamada gera a penalidade prevista na Convenção Coletiva de Trabalho da categoria' +
       (c.cct_ano ? ` (vigência ${c.cct_ano} e anteriores)` : '') +
       (c.cct_clausula_multa ? `, nos termos da cláusula ${c.cct_clausula_multa} da referida convenção` : ', nos termos da cláusula de penalidade da referida convenção') +
-      ', por descumprimento, pela reclamada, das obrigações convencionais a seguir elencadas. Encerre o parágrafo com transição que introduza a lista de infrações (ex.: "...a seguir elencadas:"). NÃO escreva a lista de infrações (ela já está no template). NÃO cite valores em R$.',
+      '. Desenvolva o argumento com contexto completo (natureza da multa convencional, função sancionatória e protetiva da CCT, irrelevância da culpa para a incidência da penalidade), em parágrafos coesos. Encerre com a transição que introduz a lista de infrações (ex.: "...a seguir elencadas:"). NÃO escreva a lista de infrações (ela já está no template). NÃO cite valores em R$.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em direito coletivo e multas convencionais. Redija o parágrafo de abertura da seção de multas convencionais em prosa jurídica rica e coerente, sem valores em R$ e sem reproduzir a lista de infrações.',
+      'Você é advogado(a) trabalhista especialista em direito coletivo e multas convencionais. Redija o capítulo COMPLETO de fundamentação das multas convencionais em prosa jurídica argumentativa e coerente, sem valores em R$ e sem reproduzir a lista de infrações (que já consta do template).',
   },
 ];
 
