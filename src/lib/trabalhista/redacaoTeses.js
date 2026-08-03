@@ -44,9 +44,9 @@ export const ESPECIALISTAS = [
     campo: 'BLOCO_ESPINHA_RESCISAO',
     ativo: () => true,
     instrucao:
-      'Escreva APENAS o capítulo da modalidade de rescisão aplicável (conforme tipo_dispensa): a fundamentação da tese rescisória e o rol de faltas/argumentos correspondente. NÃO escreva jornada, dano moral, verbas rescisórias calculadas nem qualquer outro tópico.',
+      'Escreva o capítulo COMPLETO da modalidade de rescisão aplicável (conforme tipo_dispensa), em prosa jurídica fluida, articulada e SUBSTANCIAL (NÃO frases curtas, resumos ou bullet points soltos): (1) FATOS — narre, com base nos dados do caso, a situação que configura a modalidade (data e circunstâncias do desligamento, condutas do empregador que fundamentam a tese); (2) FUNDAMENTO LEGAL/NORMATIVO — desenvolva a fundamentação da tese rescisória e o rol de faltas/argumentos correspondente, citando os dispositivos da CLT aplicáveis (art. 482, 483, 484-A, 165 etc.); (3) JURISPRUDÊNCIA — trate, quando relevante, a interpretação que ampara a tese; (4) PEDIDO/CONCLUSÃO — formule o requerimento (reconhecimento da rescisão indireta, nulidade do pedido de demissão, reversão da justa causa etc.) com os reflexos cabíveis. Desenvolva cada bloco em vários parágrafos coesos. NÃO escreva jornada, dano moral, verbas rescisórias calculadas nem qualquer outro tópico.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em teses rescisórias (dispensa sem justa causa; rescisão indireta – art. 483 CLT; reversão de justa causa – art. 482 CLT; nulidade de pedido de demissão por coação – art. 9º CLT; e acordo – art. 484-A CLT). Redija o capítulo da modalidade correta com técnica e fundamentação legal.',
+      'Você é advogado(a) trabalhista especialista em teses rescisórias (dispensa sem justa causa; rescisão indireta – art. 483 CLT; reversão de justa causa – art. 482 CLT; nulidade de pedido de demissão por coação – art. 9º CLT; e acordo – art. 484-A CLT). Redija o capítulo COMPLETO da modalidade correta em prosa jurídica fluida e argumentativa — narrativa fática, fundamentação legal, jurisprudência e pedido — sem frases curtas nem resumos.',
   },
   {
     numero: 'jornada',
@@ -82,9 +82,9 @@ export const ESPECIALISTAS = [
     campo: 'BLOCO_ENQUADRAMENTO',
     ativo: (d) => !!(d.desvio_funcao || d.acumulo_funcao || d.gratificacao_funcao),
     instrucao:
-      'Escreva APENAS o capítulo de enquadramento funcional. Desvio, acúmulo e gratificação são ALTERNATIVOS sobre os mesmos fatos — escolha o correto conforme os dados e NUNCA cumule desvio com acúmulo (bis in idem). NÃO trate de jornada, dano moral nem rescisão.',
+      'Escreva o capítulo COMPLETO de enquadramento funcional, em prosa jurídica fluida, articulada e SUBSTANCIAL (NÃO frases curtas ou resumos): (1) FATOS — narre as atividades efetivamente exercidas pelo reclamante que configuram desvio, acúmulo ou gratificação de função (campos desvio_atividades/acumulo_atividades); (2) FUNDAMENTO LEGAL/NORMATIVO — fundamente o enquadramento correto com dispositivos da CLT e a multa/adicional convencional correspondente da CCT; (3) JURISPRUDÊNCIA — trate, quando relevante, a interpretação que ampara a tese; (4) PEDIDO/CONCLUSÃO — formule o requerimento do adicional/multa devida com os reflexos (DSR, aviso prévio, férias +1/3, 13º, FGTS +40%). Desenvolva cada bloco em vários parágrafos coesos. Desvio, acúmulo e gratificação são ALTERNATIVOS sobre os mesmos fatos — escolha o correto conforme os dados e NUNCA cumule desvio com acúmulo (bis in idem). NÃO trate de jornada, dano moral nem rescisão.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em desvio, acúmulo e gratificação de função. Redija o capítulo correto conforme o enquadramento, com a multa convencional correspondente, evitando bis in idem.',
+      'Você é advogado(a) trabalhista especialista em desvio, acúmulo e gratificação de função. Redija o capítulo COMPLETO do enquadramento correto em prosa jurídica argumentativa — narrativa fática, fundamentação legal, jurisprudência e pedido — sem frases curtas nem resumos.',
   },
   {
     numero: 'sumula331',
@@ -92,9 +92,9 @@ export const ESPECIALISTAS = [
     campo: 'BLOCO_SUMULA_331',
     ativo: (d) => !!d.tem_tomadora,
     instrucao:
-      'Escreva APENAS o capítulo de responsabilidade subsidiária da 2ª reclamada (tomadora), com fundamento na Súmula 331 do TST. NÃO trate de outros tópicos.',
+      'Escreva o capítulo COMPLETO de responsabilidade subsidiária da 2ª reclamada (tomadora), em prosa jurídica fluida, articulada e SUBSTANCIAL (NÃO frases curtas ou resumos): (1) FATOS — narre a relação de terceirização/tomada de serviços e a inserção do reclamante na atividade-fim da tomadora; (2) FUNDAMENTO LEGAL/NORMATIVO — fundamente a responsabilidade subsidiária com a Súmula 331 do TST e os arts. 4º e 5º do Decreto-Lei 200/1967; (3) JURISPRUDÊNCIA — trate, quando relevante, a interpretação que ampara a tese; (4) PEDIDO/CONCLUSÃO — formule o requerimento de condenação subsidiária da tomadora pelos créditos deferidos. Desenvolva cada bloco em vários parágrafos coesos. USE SEMPRE "subsidiariamente"/"responsabilidade subsidiária" — nunca "solidária". NÃO trate de outros tópicos.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em terceirização e responsabilidade subsidiária (Súmula 331 do TST). Redija o capítulo pedindo a condenação subsidiária da tomadora pelos créditos deferidos.',
+      'Você é advogado(a) trabalhista especialista em terceirização e responsabilidade subsidiária (Súmula 331 do TST). Redija o capítulo COMPLETO em prosa jurídica argumentativa — narrativa fática, fundamentação legal, jurisprudência e pedido — sem frases curtas nem resumos.',
   },
   {
     numero: 'multas_convencionais',
@@ -203,7 +203,7 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
     '- Cite SOMENTE as cláusulas listadas em CLÁUSULAS DA CCT. Nunca invente número de cláusula.',
     '- Escreva APENAS os capítulos solicitados abaixo. NÃO escreva endereçamento, qualificação das partes, valor da causa, honorários, data ou fecho — o sistema gera isso.',
     '- ESTRUTURA FIXA — quatro blocos legais por capítulo, nesta ordem: (1) FATOS — narre o que ocorreu no caso concreto em prosa articulada (sem bullets mecânicos); (2) FUNDAMENTO LEGAL/NORMATIVO — cite dispositivos da CLT, Súmulas do TST e cláusulas da CCT integrados ao texto (não como lista solta); (3) JURISPRUDÊNCIA — trate, quando relevante, a interpretação que ampara a tese; (4) PEDIDO/CONCLUSÃO — formule o requerimento com os reflexos (DSR, aviso prévio, férias+1/3, 13º, FGTS+40%).',
-    '- REDAÇÃO NATURAL: escreva em parágrafos jurídicos coesos e fluídos, como um advogado experiente em uma petição — NÃO use o padrão rígido "fato → artigo → Súmula → impugnação → pedido" repetido mecanicamente em cada capítulo. Varie a construção das frases, encadeie os argumentos e evite listas/colchetes e linguagem robótica; o texto deve soar natural, não enlatado.',
+    '- REDAÇÃO NATURAL: escreva em parágrafos jurídicos coesos e fluídos, como um advogado experiente em uma petição — NÃO use o padrão rígido "fato → artigo → Súmula → impugnação → pedido" repetido mecanicamente em cada capítulo. Varie a construção das frases, encadeie os argumentos e evite listas/colchetes e linguagem robótica; o texto deve soar natural, não enlatado. Cada capítulo deve ser SUBSTANCIAL e COMPLETO: narrativa fática desenvolvida, fundamentação legal ampla e jurisprudência articulada — NÃO entregue resumos, frases curtas, bullet points soltos nem um único parágrafo por capítulo; desenvolva cada um dos quatro blocos (fatos, fundamento, jurisprudência, pedido) em vários parágrafos.',
     '- Mantenha a impugnação da defesa (Súmula 338) e os reflexos quando cabíveis, mas inseridos organicamente no bloco de pedido, não como etapa idêntica obrigatória em todos os capítulos.',
     '- Cada capítulo NÃO deve invadir o tópico de outro. Respeite o escopo indicado em cada um.',
     '- CONCORDÂNCIA DE GÊNERO (STRICT): o campo recl_genero indica "M" (masculino) ou "F" (feminino). Aplique concordância PERFEITA em TODO o texto. Se MASCULINO, é PROIBIDO o uso de "a reclamante", "a obreira", "foi contratada", "foi prejudicada", "rendê-la" ou qualquer flexão feminina — use "o reclamante", "foi contratado", "foi prejudicado", "rendê-lo". Se FEMININO, o inverso. Use "reclamante" como substantivo (nunca "autor") e flexione adjetivos e particípios adequadamente. Não troque o gênero de "reclamada" (a empresa). Verifique todo o texto gerado antes de entregar o output.',
