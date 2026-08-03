@@ -284,7 +284,7 @@ DADOS BÁSICOS:
 - CPF/CNPJ/PIS somente números.
 - recl_serie: número de série da CTPS ("serie: 25795" → "25795"). recl_ctps: só o número da CTPS (sem série).
 - recl_genero: 'M' ou 'F' inferido do nome ("brasileiro/solteiro" → 'M').
-- recl_email: e-mail pessoal do reclamante quando informado (ex.: marcos81769111@gmail.com).
+- recl_email: e-mail PESSOAL do reclamante. Extraia SEMPRE que houver qualquer e-mail na entrevista, mesmo sem rótulo (varredura completa), em qualquer seção do roteiro. Exclua o domínio do escritório (@favadvogados.com.br / juridico@...). NUNCA deixe em branco se houver e-mail pessoal (gmail/hotmail/outlook/yahoo etc.).
 
 MUNICÍPIO/GRAFIA:
 - Grafia correta dos municípios: "Itapecerica da Serra/SP" (NUNCA "Itapecerica da Terra"), "São Paulo/SP", "Osasco/SP".

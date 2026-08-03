@@ -108,11 +108,22 @@ export function extrairDeterministico(texto) {
   if (endsLog[0]) caso.recl1_logradouro = endsLog[0];
   if (endsLog[1]) caso.recl2_logradouro = endsLog[1];
 
-  // E-mail pessoal do reclamante (após "correio eletrônico:"), excluindo o
-  // domínio do escritório (trabalhista@favadvogados.com.br). Sem isto, a minuta
+  // E-mail pessoal do reclamante. Robusto a roteiros diferentes de entrevista:
+  // tenta rótulos comuns (correio eletrônico / e-mail / email) e, se não houver,
+  // varre o texto inteiro por e-mails, excluindo o domínio do escritório —
+  // fica com o primeiro e-mail pessoal (não corporativo). Sem isto, a minuta
   // dizia "O autor não possui correio eletrônico" mesmo com o e-mail na entrevista.
-  const emailMatch = /correio\s*eletr[ôo]nico[:\s]*([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i.exec(t);
-  if (emailMatch && !/favadvogados/i.test(emailMatch[1])) caso.recl_email = emailMatch[1].trim().toLowerCase();
+  const OFFICE_DOM = /favadvogados|@advogados\b|juridico@/i;
+  function extrairEmailPessoal(texto) {
+    const labelMatch = /\b(?:correio\s*eletr[ôo]nico|e-?mail|correio)\s*[:=]\s*([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i.exec(texto);
+    if (labelMatch && !OFFICE_DOM.test(labelMatch[1])) return labelMatch[1].trim().toLowerCase();
+    const todos = [...texto.matchAll(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi)].map((m) => m[0]);
+    const pessoais = todos.filter((e) => !OFFICE_DOM.test(e));
+    const alvo = pessoais[0];
+    return alvo ? alvo.trim().toLowerCase() : undefined;
+  }
+  const emailPessoal = extrairEmailPessoal(t);
+  if (emailPessoal) caso.recl_email = emailPessoal;
 
   // Datas de admissão e rescisão
   const adm = matchAny(t, /Admiss[ãa]o[:\s]*(\d{2}\/\d{2}\/\d{4})/i);
