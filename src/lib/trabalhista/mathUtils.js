@@ -130,9 +130,22 @@ export function avosEntreDatas(admissao, dataFinal, contarProjecaoUltimoMes) {
 // ============================================================
 // Verbas rescisórias (Lei 12.506/2011 etc.)
 // ============================================================
-export function avisoPrevio(salario, anos) {
+// Aviso prévio indenizado: 30 dias + 3 por ano completo, máx. 90 dias.
+// Na rescisão por acordo (art. 484-A, I, CLT) é pago pela METADE.
+export function avisoPrevio(salario, anos, { acordo = false } = {}) {
   if (!salario || anos == null) return null;
-  const dias = Math.min(30 + anos * 3, 90);
+  const diasIntegral = Math.min(30 + anos * 3, 90);
+  const dias = acordo ? Math.round(diasIntegral / 2) : diasIntegral;
+  return { dias, diasIntegral, valor: round2((salario / 30) * dias) };
+}
+
+// Saldo de salário do mês da rescisão (dias do mês ÷ 30 × salário — mês
+// comercial de 30 dias, padrão na prática trabalhista). Verba incontroversa.
+export function saldoSalario(salario, dataRescisao) {
+  if (!salario || !dataRescisao) return null;
+  const r = new Date(dataRescisao);
+  if (isNaN(r.getTime())) return null;
+  const dias = r.getDate();
   return { dias, valor: round2((salario / 30) * dias) };
 }
 
@@ -149,10 +162,13 @@ export function feriasProporcionais(salario, meses) {
   return { avos, valor: round2(base * (4 / 3)) };
 }
 
-export function fgtsPeriodo(salario, meses) {
+// FGTS do período (8%/mês) + multa rescisória. Multa padrão 40%; na rescisão
+// por acordo (art. 484-A, II, CLT) é 20% — passe { multaPct: 0.2 }.
+export function fgtsPeriodo(salario, meses, { multaPct = 0.4 } = {}) {
   if (!salario || meses == null) return null;
   const deposito = round2(salario * 0.08 * meses);
-  return { deposito, multa40: round2(deposito * 0.4) };
+  const multa = round2(deposito * multaPct);
+  return { deposito, multa, multa40: multa, multaPct };
 }
 
 export function dsrSobreValor(valor) {
