@@ -33,8 +33,6 @@ const CALC_CAMPO = {
   'Salários em aberto': 'VALOR_SALARIOS_ABERTO',
 };
 
-const TETO_VALOR_CAUSA = 400000;
-
 // Contrato de tags do .docx (documentação viva).
 export const CAMPOS_TEMPLATE = [
   'VARA_CIDADE_REGIAO', 'RITO',
@@ -160,7 +158,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
     if (campo) dados[campo] = formatBRL(c.valor);
     somaCausa += Number(c.valor) || 0;
   }
-  const valorCausa = brlComExtenso(round2(Math.min(somaCausa, TETO_VALOR_CAUSA)));
+  const valorCausa = brlComExtenso(round2(somaCausa));
   dados.VALOR_CAUSA_TOTAL = valorCausa;
   // Aliases — algumas versões do template usam tags diferentes para o mesmo valor
   dados.VALOR_CAUSA = valorCausa;

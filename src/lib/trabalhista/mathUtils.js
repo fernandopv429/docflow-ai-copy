@@ -78,10 +78,23 @@ export function mesesContrato(admissao, rescisao) {
   if (!admissao || !rescisao) return null;
   const a = new Date(admissao);
   const r = new Date(rescisao);
-  if (isNaN(a) || isNaN(r) || r < a) return null;
-  let meses = (r.getFullYear() - a.getFullYear()) * 12 + (r.getMonth() - a.getMonth());
-  if (r.getDate() >= a.getDate()) {
-    if (r.getDate() - a.getDate() >= 14) meses += 1;
+  if (isNaN(a.getTime()) || isNaN(r.getTime()) || r < a) return null;
+  // Mês (avo) conta quando há 15 dias ou mais de presença. Contagem mês a
+  // mês (mesma base do avosEntreDatas), sem cap, para contratos longos (>12
+  // meses) serem computados corretamente no FGTS/acúmulo/desvio/etc. O
+  // atalho anterior (diff de dias >= 14) falhava quando o dia da rescisão
+  // era anterior ao da admissão, superestimando os meses.
+  let meses = 0;
+  const inicioMs = new Date(a.getFullYear(), a.getMonth(), 1).getTime();
+  const fimMs = new Date(r.getFullYear(), r.getMonth(), 1).getTime();
+  const cursor = new Date(a.getFullYear(), a.getMonth(), 1);
+  while (cursor.getTime() <= fimMs) {
+    const mesEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const start = cursor.getTime() === inicioMs ? a : new Date(cursor);
+    const end = cursor.getTime() === fimMs ? r : mesEnd;
+    const dias = Math.floor((end - start) / 86400000) + 1;
+    if (dias >= 15) meses += 1;
+    cursor.setMonth(cursor.getMonth() + 1);
   }
   return Math.max(meses, 0);
 }
