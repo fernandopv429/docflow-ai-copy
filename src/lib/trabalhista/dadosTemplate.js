@@ -408,5 +408,41 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
       `Cumpre ressaltar que o obreiro pode ter feito outras escalas e horários que serão devidamente apreciados em audiência inaugural e, posteriormente, em sede de réplica.`;
   }
 
+  // Fallback da ESPINHA DA RESCISÃO: narrativa padrão da modalidade aplicável
+  // (determinística). A IA sobrescreve via BLOCO_ESPINHA_RESCISAO quando ativa.
+  if (!dados.BLOCO_ESPINHA_RESCISAO) {
+    const motivo = dados.MOTIVO_SAIDA_RESUMIDO || 'foi dispensado sem justa causa';
+    let nucleo;
+    if (dados.sem_justa_causa) {
+      nucleo = 'A dispensa imotivada resta plenamente configurada, não havendo qualquer conduta faltosa por parte do reclamante que justificasse a medida, restando asseguradas todas as verbas rescisórias previstas na legislação trabalhista.';
+    } else if (dados.rescisao_indireta) {
+      nucleo = 'A rescisão indireta do contrato de trabalho resta configurada nos termos do art. 483 da CLT, em virtude das graves violações contratuais praticadas pela reclamada, autorizando o reclamante a pleitear todas as verbas rescisórias como se dispensado sem justa causa fosse.';
+    } else if (dados.coacao_demissao) {
+      nucleo = 'O pedido de demissão restou eivado de nulidade, por ter sido extraído mediante coação e ameaça, configurando vício de consentimento nos termos do art. 9º da CLT, devendo ser reconhecida a nulidade do pedido de demissão e a recondução à rescisão imotivada.';
+    } else if (dados.reversao_justa_causa) {
+      nucleo = 'A justa causa aplicada carece de lastro fático e probatório, devendo ser revertida em dispensa imotivada, com o pagamento de todas as verbas rescisórias decorrentes.';
+    } else {
+      nucleo = 'A modalidade rescisória resta configurada nos termos da legislação aplicável, restando asseguradas as verbas decorrentes.';
+    }
+    dados.BLOCO_ESPINHA_RESCISAO =
+      `O reclamante foi admitido pela 1ª reclamada em ${dados.DATA_ADMISSAO || '[DATA DE ADMISSÃO]'}, ` +
+      `para exercer a função de ${dados.RECL_FUNCAO || '[FUNÇÃO]'}, tendo ${motivo} em ${dados.DATA_RESCISAO || '[DATA DE RESCISÃO]'}. ` +
+      `${nucleo} ` +
+      `Diante do exposto, requer o reconhecimento da modalidade rescisória acima delineada, com o pagamento de todas as verbas rescisórias devidas, nos termos do rol de pedidos ao final apresentado.`;
+  }
+
+  // Fallback do DANO MORAL: narrativa concreta determinística (mesma do
+  // DANO_MORAL_FATO_ESPECIFICO). A IA sobrescreve via BLOCO_DANO_MORAL.
+  if (!dados.BLOCO_DANO_MORAL && caso.tem_dano_moral) {
+    dados.BLOCO_DANO_MORAL = dados.DANO_MORAL_FATO_ESPECIFICO || narrativaDanoMoral(caso);
+  }
+
+  // Fallback da SÚMULA 331 (responsabilidade subsidiária): parágrafo padrão.
+  // A IA sobrescreve via BLOCO_SUMULA_331 quando ativa.
+  if (!dados.BLOCO_SUMULA_331 && dados.tem_tomadora) {
+    dados.BLOCO_SUMULA_331 =
+      `A 2ª reclamada, na qualidade de tomadora dos serviços, responde subsidiariamente pelas obrigações trabalhistas contraídas pela 1ª reclamada em relação ao reclamante, com fundamento na Súmula 331 do Tribunal Superior do Trabalho e nos artigos 4º e 5º do Decreto-Lei nº 200/1967, eis que o obreiro desempenhava suas atividades integrado à atividade-fim da tomadora, exercendo funções essenciais e permanentes, o que atrai a responsabilidade subsidiária da contratante pelos créditos deferidos nesta ação.`;
+  }
+
   return dados;
 }
