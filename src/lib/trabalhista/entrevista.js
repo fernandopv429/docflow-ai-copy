@@ -12,6 +12,7 @@ import { BLOCO_REGRAS_QUALIDADE } from './regrasQualidadeFav';
 import { invokeLLMComRetry } from './llmRetry';
 import { aplicarFormatacaoPadrao, aplicarFechoDeterministico, removerPedidosZerados, esqueletoDoModelo } from './formatacaoPeca';
 import { traceAiCall } from '@/lib/sessionTrace';
+import { consultarCnpj, consultarCep, CONFIG_INTEGRACOES_PADRAO } from './consultas';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -395,40 +396,6 @@ export function extrairCnpjs(texto) {
   return [...encontrados];
 }
 
-function formatarCnpj(digits) {
-  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-}
-
-export async function consultarCnpj(cnpj) {
-  const digits = (cnpj || '').replace(/\D/g, '');
-  if (digits.length !== 14) return { cnpj, erro: 'CNPJ inválido (precisa de 14 dígitos)' };
-  try {
-    const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`);
-    if (resp.status === 404) return { cnpj: formatarCnpj(digits), erro: 'não encontrado na Receita' };
-    if (!resp.ok) return { cnpj: formatarCnpj(digits), erro: `erro HTTP ${resp.status}` };
-    const d = await resp.json();
-    const cep = (d.cep || '').replace(/\D/g, '');
-    const endereco = [
-      `${d.descricao_tipo_de_logradouro || ''} ${d.logradouro || ''}`.trim(),
-      d.numero,
-      d.complemento,
-      d.bairro,
-      [d.municipio, d.uf].filter(Boolean).join('/'),
-    ]
-      .filter(Boolean)
-      .join(', ');
-    return {
-      cnpj: formatarCnpj(digits),
-      razao_social: d.razao_social || '',
-      endereco,
-      cep: cep.length === 8 ? `${cep.slice(0, 5)}-${cep.slice(5)}` : cep,
-      situacao: d.descricao_situacao_cadastral || '',
-    };
-  } catch (e) {
-    return { cnpj: formatarCnpj(digits), erro: 'falha de rede ao consultar a Receita' };
-  }
-}
-
 export async function enriquecerCnpjs(cnpjs) {
   const unicos = [
     ...new Set((cnpjs || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14)),
@@ -469,49 +436,6 @@ export function extrairCeps(texto) {
   return [...encontrados];
 }
 
-export async function consultarCep(cep) {
-  const digits = (cep || '').replace(/\D/g, '');
-  if (digits.length !== 8) return { cep, erro: 'CEP inválido (precisa de 8 dígitos)' };
-  const fmt = `${digits.slice(0, 5)}-${digits.slice(5)}`;
-  // 1) ViaCEP (traz município + código IBGE)
-  try {
-    const resp = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
-    if (resp.ok) {
-      const d = await resp.json();
-      if (!d.erro) {
-        return {
-          cep: fmt,
-          logradouro: d.logradouro || '',
-          bairro: d.bairro || '',
-          municipio: d.localidade || '',
-          uf: d.uf || '',
-          ibge: d.ibge || '',
-        };
-      }
-    }
-  } catch (e) {
-    // segue para o fallback
-  }
-  // 2) Fallback BrasilAPI
-  try {
-    const resp = await fetch(`https://brasilapi.com.br/api/cep/v1/${digits}`);
-    if (resp.ok) {
-      const d = await resp.json();
-      return {
-        cep: fmt,
-        logradouro: d.street || '',
-        bairro: d.neighborhood || '',
-        municipio: d.city || '',
-        uf: d.state || '',
-        ibge: '',
-      };
-    }
-  } catch (e) {
-    // ignora
-  }
-  return { cep: fmt, erro: 'não encontrado' };
-}
-
 export async function enriquecerCeps(ceps) {
   const unicos = [
     ...new Set((ceps || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 8)),
@@ -534,16 +458,6 @@ function blocoCeps(dados) {
 // ============================================================
 // Configuração das integrações (liga/desliga cada tool). Singleton.
 // ============================================================
-export const CONFIG_INTEGRACOES_PADRAO = {
-  cnpj_ativo: true,
-  cep_ativo: true,
-  datajud_ativo: false,
-  datajud_tribunal: 'trt2',
-  datajud_size: 5,
-  cct_ativo: true,
-  cct_categoria: '',
-};
-
 export async function carregarConfigIntegracoes() {
   return withRuntimeCache('config-integracoes', 'atual', async () => {
     try {

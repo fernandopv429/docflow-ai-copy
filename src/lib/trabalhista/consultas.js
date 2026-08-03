@@ -13,6 +13,8 @@ export const CONFIG_INTEGRACOES_PADRAO = {
   datajud_ativo: false,
   datajud_tribunal: 'trt2',
   datajud_size: 5,
+  cct_ativo: true,
+  cct_categoria: '',
 };
 
 export async function carregarConfigIntegracoes() {
