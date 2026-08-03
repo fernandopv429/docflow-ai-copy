@@ -53,6 +53,13 @@ function _paraTx(conteudo, pPr = '') {
 }
 // Insere, DEPOIS da posição `posDepois` e ANTES da posição `posAntes`, os tags de
 // abertura/fechamento do fallback invertido, com o bloco de IA no topo.
+// Substitui uma frase no XML permitindo tags XML entre as palavras (preserva o resto).
+function _substituirFraseTagTolerant(xml, frase, destino) {
+  const partes = frase.split(/\s+/).map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pattern = partes.join('\\s*(?:<[^>]+>)*\\s*');
+  return xml.replace(new RegExp(pattern, 'gi'), destino);
+}
+
 function _envolver(xml, posAntes_ini, posDepois_fim, bloco, pPr) {
   const antes = _paraTx(`{{#${bloco}}}{{${bloco}}}{{/${bloco}}}`, pPr) + _paraTx(`{{^${bloco}}}`);
   const fim = _paraTx(`{{/${bloco}}}`);
@@ -159,6 +166,23 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     if (ini >= 0 && fim >= 0) xml = _envolver(xml, ps[ini].start, ps[fim].end, 'BLOCO_JORNADA', _pPr(ps[ini].raw));
   }
 
+  // 10) GÊNERO: troca "o autor" fixo do template por "o reclamante" — a flexão
+  // de exportação (preencherDocxTemplate.aplicarGenero) já converte "o
+  // reclamante" → "a reclamante" quando o reclamante é mulher. "a parte autora"
+  // (a parte = feminino gramatical para ambos os gêneros) é preservada. Assim o
+  // template novo sai já estruturado para o gênero correto, sem edição manual.
+  const FRASES_AUTOR = [
+    ['O autor opta pela tramitação', 'O reclamante opta pela tramitação'],
+    ['O autor possui endereço de e-mail pessoal', 'O reclamante possui endereço de e-mail pessoal'],
+    ['o autor prestou serviços', 'o reclamante prestou serviços'],
+    ['patrono do autor', 'patrono do reclamante'],
+    ['O autor, nos termos da inclusa declaração', 'O reclamante, nos termos da inclusa declaração'],
+  ];
+  let autorCorrigido = false;
+  for (const [a, b] of FRASES_AUTOR) {
+    if (xml.includes(a)) { xml = _substituirFraseTagTolerant(xml, a, b); autorCorrigido = true; }
+  }
+
   zip.file('word/document.xml', xml);
   const blob = zip.generate({
     type: 'blob',
@@ -180,5 +204,6 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     multa467Adicionada: !jaTem467,
     multa477Adicionada: !jaTem477,
     salariosAbertoAdicionado: !jaTemSalarios,
+    autorCorrigido,
   };
 }
