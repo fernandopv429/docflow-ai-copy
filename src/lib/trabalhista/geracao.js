@@ -8,6 +8,7 @@ import { calcularVerbasCaso } from './mathUtils';
 import { montarDadosTemplate } from './dadosTemplate';
 import { redigirTesesIA } from './redacaoTeses';
 import { listarModelosAtivos, rankearModelos } from './matching';
+import { gerarFaltantesTexto } from './guiaCampos';
 
 // Extrai texto puro de arquivos .docx anexados como entrevista.
 // A IA NÃO lê .docx por visão (só PDF/imagem) — sem isto, os dados de um
@@ -169,8 +170,8 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   if (alertasExtracao.length) {
     const bloqueantes = alertasExtracao.filter((a) => a.severidade === 'BLOQUEANTE');
     const atencoes = alertasExtracao.filter((a) => a.severidade === 'ATENCAO');
-    if (bloqueantes.length) notify(`⚠ ${bloqueantes.length} alerta(s) bloqueante(s) na extração.`);
-    if (atencoes.length) notify(`⚠ ${atencoes.length} inconsistência(s) validadas na extração (teses sem apoio foram desativadas).`);
+    if (bloqueantes.length) notify(`⚠ ${bloqueantes.length} alerta(s) bloqueante(s) na extração: ${bloqueantes.map((a) => a.descricao).join('; ')}.`);
+    if (atencoes.length) notify(`⚠ ${atencoes.length} inconsistência(s) validadas na extração: ${atencoes.map((a) => a.descricao).join('; ')}.`);
   }
 
   // 2ª passada: CNPJs/CEPs que o parser extraiu do PDF (caso.recl*_cnpj /
@@ -274,14 +275,10 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
-  // Aviso de campos críticos ausentes após toda a extração
-  const camposCriticos = [];
-  if (!caso.salario) camposCriticos.push('salário (cálculos rescisórios ficarão zerados)');
-  if (!caso.recl_nome) camposCriticos.push('nome do reclamante');
-  if (!caso.data_admissao) camposCriticos.push('data de admissão');
-  if (!caso.data_rescisao) camposCriticos.push('data de rescisão');
-  if (camposCriticos.length) {
-    notify(`⚠ Campos críticos não encontrados: ${camposCriticos.join(', ')}. Se o documento é um PDF de imagem, tente enviar novamente — a IA de visão pode precisar de mais tempo. Você também pode informar esses dados diretamente no chat.`);
+  // Aviso de campos críticos ausentes após toda a extração (guia de campos)
+  const faltantes = gerarFaltantesTexto(caso);
+  if (faltantes) {
+    notify(`⚠ ${faltantes}\nSe o documento é um PDF de imagem, tente enviar novamente — a IA de visão pode precisar de mais tempo. Você também pode informar esses dados diretamente no chat.`);
   }
   if (caso.data_admissao && caso.data_rescisao) {
     notify(`Contrato: ${caso.data_admissao} a ${caso.data_rescisao} (${Math.round((new Date(caso.data_rescisao) - new Date(caso.data_admissao)) / 86400000 / 30.44)} meses) — função: ${caso.funcao || 'não informada'}.`);

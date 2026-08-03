@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { traceAiCall } from '@/lib/sessionTrace';
+import { gerarGuiaCamposTexto, validarFormatoCampos } from './guiaCampos';
 
 // ============================================================
 // Agente extrator: converte texto livre e/ou PDF da entrevista
@@ -391,7 +392,9 @@ FATOS NARRADOS:
 - A auditoria cruza esta lista com os capítulos da minuta — nenhum fato pode faltar.
 
 === RETORNO ===
-Responda APENAS com o objeto JSON. NÃO inclua introduções, saudações, comentários ou qualquer texto fora do JSON. Campos sem informação: omita (não retorne null, "" ou placeholders).`,
+Responda APENAS com o objeto JSON. NÃO inclua introduções, saudações, comentários ou qualquer texto fora do JSON. Campos sem informação: omita (não retorne null, "" ou placeholders).
+
+${gerarGuiaCamposTexto()}`,
     model: 'claude_sonnet_4_6',
     response_json_schema: CASO_SCHEMA,
   };
@@ -428,5 +431,11 @@ Responda APENAS com o objeto JSON. NÃO inclua introduções, saudações, comen
 
   // --- 4) Normalização + validação de regras + alertas ---
   const { caso, alertas } = normalizarCaso(bruto);
-  return { caso, alertas };
+
+  // --- 4b) Validação de formato pós-extração (guia de campos) ---
+  // Checa formato de cada campo contra o esperado, detecta campos
+  // críticos vazios, números como string, dano_fatos curto, etc.
+  const alertasFormato = validarFormatoCampos(caso);
+
+  return { caso, alertas: [...alertas, ...alertasFormato] };
 }
