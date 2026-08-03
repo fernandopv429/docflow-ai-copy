@@ -203,9 +203,22 @@ export function extrairDeterministico(texto) {
     if (dano) caso.dano_fatos = dano.trim();
   }
 
-  // Gratificação de função (bnus de meta/bonificao)
+  // Gratificação de função (bnus de meta/bonificao) — valor fixo mensal
   if (/gratifica[çc][ãa]o/i.test(t)) {
     caso.tem_gratificacao = true;
+    const gratVal = matchAny(t, /GRATIFICA[ÇC][ÃA]O[:\s]*R\$\s*([\d.,]+)/i);
+    if (gratVal) {
+      const v = comoNumero(gratVal);
+      if (v != null && v > 0) caso.gratificacao_valor = v;
+    }
+  }
+
+  // Insalubridade — ambiente insalubre, odor, EPI inadequado
+  if (/insalubr/i.test(t) || /ambient[ei]\s+insalubr|odor\s+(?:de|proveniente)|EPIs?\s+inadequad/i.test(t)) {
+    caso.tem_insalubridade = true;
+    const ins = matchAny(t, /(?:INSALUBRIDADE|AMBIENTE\s+INSALUBRE)[:\s]*([^\n]+)/i);
+    if (ins) caso.insalubridade_descricao = ins.trim();
+    else if (/odor|EPI/i.test(t)) caso.insalubridade_descricao = 'Ambiente de trabalho insalubre com odor e sem EPIs adequados.';
   }
 
   // Vigilante -> periculosidade

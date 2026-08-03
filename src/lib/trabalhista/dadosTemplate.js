@@ -352,6 +352,7 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.doenca_ocupacional = flag(caso.tem_doenca);
   dados.estabilidade_doenca = flag(caso.tem_estabilidade || caso.tem_doenca);
   dados.pensao_vitalicia = flag(caso.tem_pensao);
+  dados.insalubridade = flag(caso.tem_insalubridade);
   dados.folgas_trabalhadas = flag(caso.tem_ft || caso.val_ft || caso.ft_qtd_media);
   dados.tem_ferias_vencidas = flag(caso.tem_ferias_vencidas);
 
@@ -376,10 +377,10 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   // Quando a IA roda com sucesso, geracao.js sobrescreve pelo capítulo
   // sob medida da especialista de IA.
   if (dados.desvio_funcao) {
-    const atv = caso.desvio_atividades ||
-      'atribuições próprias do setor de Prevenção de Perdas, realizando conferência de mercadorias, controle e verificação da validade de produtos, registros operacionais, conferência de cargas, controle da quantidade de paletes e conferência de materiais';
+    const atv = caso.desvio_atividades || 'atividades diversas da função contratada';
+    const clausulaDesvio = caso.cct_clausula_multa ? `cláusula ${caso.cct_clausula_multa}` : 'cláusula de desvio de função';
     dados.BLOCO_ENQUADRAMENTO =
-      `Não obstante contratado para exercer a função de ${(caso.funcao || 'VIGILANTE').toUpperCase()}, o reclamante era compelido, por determinação da 1ª reclamada e no interesse da 2ª reclamada, a exercer, de forma habitual, ${atv}, funções de maior complexidade e responsabilidade que extrapolam as tarefas típicas da função contratada, em flagrante desvio funcional, vedado pela cláusula 64ª, parágrafos primeiro e segundo, da Convenção Coletiva de Trabalho da Categoria. ` +
+      `Não obstante contratado para exercer a função de ${(caso.funcao || '[FUNÇÃO]').toUpperCase()}, o reclamante era compelido, por determinação da 1ª reclamada${dados.tem_tomadora ? ' e no interesse da 2ª reclamada' : ''}, a exercer, de forma habitual, ${atv}, funções de maior complexidade e responsabilidade que extrapolam as tarefas típicas da função contratada, em flagrante desvio funcional, vedado pela ${clausulaDesvio} da Convenção Coletiva de Trabalho da Categoria. ` +
       `Portanto, requer a condenação da reclamada ao pagamento da multa convencional de 50% (cinquenta por cento) do piso salarial da categoria por mês laborado, durante todo o período contratual, com reflexos em DSR, aviso prévio, férias acrescidas de 1/3, 13º salários e FGTS + 40%.`;
   }
 
@@ -404,8 +405,11 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
     const hor = caso.jornada_horario || '[HORÁRIOS]';
     const esc = caso.escala || (dados.escala_12x36 ? '12x36' : dados.escala_4x2 ? '4x2' : '[ESCALA]');
     const prorrog = caso.prorrogacao_jornada ? `, estendia a jornada ${caso.prorrogacao_jornada}` : '';
+    const intervaloTxt = caso.intervalo_usufruido
+      ? `concessão parcial do intervalo para refeição e descanso de ${caso.intervalo_usufruido}`
+      : 'concessão parcial do intervalo intrajornada';
     dados.BLOCO_JORNADA =
-      `Para elucidação dos direitos aqui pleiteados, o reclamante laborou no seguinte horário: ${hor}, dependendo das necessidades dos serviços${prorrog}, sob pena de advertência, ou até mesmo justa causa, em escala ${esc}, com a concessão parcial do intervalo para refeição e descanso de aproximadamente 10/15 minutos. ` +
+      `Para elucidação dos direitos aqui pleiteados, o reclamante laborou no seguinte horário: ${hor}, dependendo das necessidades dos serviços${prorrog}, sob pena de advertência, ou até mesmo justa causa, em escala ${esc}, com a ${intervaloTxt}. ` +
       `Cumpre ressaltar que o obreiro pode ter feito outras escalas e horários que serão devidamente apreciados em audiência inaugural e, posteriormente, em sede de réplica.`;
   }
 
@@ -436,6 +440,13 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   // DANO_MORAL_FATO_ESPECIFICO). A IA sobrescreve via BLOCO_DANO_MORAL.
   if (!dados.BLOCO_DANO_MORAL && caso.tem_dano_moral) {
     dados.BLOCO_DANO_MORAL = dados.DANO_MORAL_FATO_ESPECIFICO || narrativaDanoMoral(caso);
+  }
+
+  // Fallback da INSALUBRIDADE: narrativa determinística do ambiente insalubre.
+  // A IA sobrescreve via BLOCO_INSALUBRIDADE quando ativa.
+  if (!dados.BLOCO_INSALUBRIDADE && dados.insalubridade) {
+    dados.BLOCO_INSALUBRIDADE = caso.insalubridade_descricao ||
+      'O reclamante laborava em ambiente insalubre, sem a observância das normas de saúde, segurança e higiene do trabalho, e sem o fornecimento de equipamentos de proteção individual adequados, configurando violação aos arts. 189 e 192 da CLT.';
   }
 
   // Fallback da SÚMULA 331 (responsabilidade subsidiária): parágrafo padrão.

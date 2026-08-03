@@ -89,6 +89,9 @@ const CASO_SCHEMA = {
     tem_adic_noturno: { type: 'boolean', description: 'Houve labor em horário noturno' },
     tem_integracao_por_fora: { type: 'boolean', description: 'Pagamento "por fora" (dinheiro/PIX)' },
     tem_periculosidade: { type: 'boolean' },
+    tem_insalubridade: { type: 'boolean', description: 'Ambiente insalubre (odor, EPI inadequado, sem ventilação)' },
+    insalubridade_descricao: { type: 'string', description: 'Descrição da insalubridade (ex.: odor de EVA, sem circulação de ar, EPIs inadequados)' },
+    gratificacao_valor: { type: 'number', description: 'Valor mensal fixo da gratificação/bônus (R$), quando diferente de 10% do salário' },
     tem_assiduidade: { type: 'boolean', description: 'Bônus de assiduidade pago a menor' },
     tem_vale_transporte: { type: 'boolean', description: 'Ausência de VT nas folgas trabalhadas (se tinha VT + fez FTs pagas informalmente → true)' },
     tem_auxilio_alimentacao: { type: 'boolean', description: 'Ausência de VA/VR nas folgas trabalhadas (se tinha VA/VR + fez FTs pagas informalmente → true)' },
@@ -159,6 +162,7 @@ const REGRAS_TESES = [
   { flag: 'tem_dano_moral', exige: ['dano_fatos'], descricao: 'Dano moral ativado sem fato concreto descrito.' },
   { flag: 'tem_salarios_aberto', exige: ['salarios_aberto'], descricao: 'Salários em aberto ativados sem indicação dos meses.' },
   { flag: 'tem_estabilidade', exige: ['doenca_descricao'], descricao: 'Estabilidade ativada sem doença descrita (a estabilidade acompanha a doença).' },
+  { flag: 'tem_insalubridade', exige: ['insalubridade_descricao'], descricao: 'Insalubridade ativada sem descrição do ambiente insalubre.' },
 ];
 
 // Campos do schema categorizados por tipo para coerção determinística.
@@ -169,16 +173,17 @@ const CAMPOS_STRING = [
   'data_admissao', 'data_rescisao', 'funcao', 'tipo_dispensa', 'jornada_horario', 'escala',
   'intervalo_usufruido', 'prorrogacao_jornada', 'acumulo_atividades', 'desvio_atividades',
   'salarios_aberto', 'doenca_descricao', 'cct_ano', 'cct_clausulas', 'cct_clausula_multa',
+  'insalubridade_descricao',
   'periodo_ferias_prop', 'periodo_13', 'periodo_ferias_vencidas', 'dano_fatos',
 ];
 const CAMPOS_NUMERO = [
   'salario', 'maior_remuneracao', 'val_ft', 'val_conducao', 'ft_qtd_media',
   'assiduidade_prometido', 'assiduidade_pago', 'assiduidade_diferenca',
-  'valor_por_fora', 'valor_aux_alimentacao',
+  'valor_por_fora', 'valor_aux_alimentacao', 'gratificacao_valor',
 ];
 const CAMPOS_BOOLEAN = [
   'tem_acumulo', 'tem_desvio', 'tem_gratificacao', 'tem_dez_min_cct', 'tem_salarios_aberto',
-  'tem_adic_noturno', 'tem_integracao_por_fora', 'tem_periculosidade', 'tem_assiduidade',
+  'tem_adic_noturno', 'tem_integracao_por_fora',   'tem_periculosidade', 'tem_insalubridade', 'tem_assiduidade',
   'tem_vale_transporte', 'tem_auxilio_alimentacao', 'tem_doenca', 'tem_estabilidade',
   'tem_pensao', 'tem_ft', 'tem_ferias_vencidas', 'tem_dano_moral',
 ];

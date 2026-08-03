@@ -97,6 +97,16 @@ export const ESPECIALISTAS = [
       'Você é advogado(a) trabalhista especialista em terceirização e responsabilidade subsidiária (Súmula 331 do TST). Redija o capítulo COMPLETO em prosa jurídica argumentativa — narrativa fática, fundamentação legal, jurisprudência e pedido — sem frases curtas nem resumos.',
   },
   {
+    numero: 'insalubridade',
+    nome: 'Insalubridade / ambiente de trabalho',
+    campo: 'BLOCO_INSALUBRIDADE',
+    ativo: (d) => !!d.insalubridade,
+    instrucao:
+      'Escreva o capítulo COMPLETO de insalubridade/ambiente de trabalho, em prosa jurídica fluida, articulada e SUBSTANCIAL: (1) FATOS — narre as condições insalubres do ambiente de trabalho (campos insalubridade_descricao: odor, falta de ventilação, EPIs inadequados, etc.) e como afetavam a saúde do reclamante; (2) FUNDAMENTO LEGAL/NORMATIVO — fundamente com os arts. 189, 192 da CLT e NR-15 do MTE, explicando o grau de insalubridade aplicável; (3) JURISPRUDÊNCIA — trate a interpretação que ampara a tese; (4) PEDIDO/CONCLUSÃO — formule o requerimento do adicional de insalubridade (mínimo 10%, médio 20% ou máximo 40% do salário mínimo, conforme grau) com reflexos em DSR, aviso prévio, férias +1/3, 13º, FGTS +40%. NÃO cite valores em R$. NÃO trate de dano moral, jornada nem rescisão.',
+    promptPadrao:
+      'Você é advogado(a) trabalhista especialista em insalubridade e saúde do trabalhador. Redija o capítulo COMPLETO da insalubridade em prosa jurídica argumentativa — narrativa fática, fundamentação legal (arts. 189/192 CLT, NR-15), jurisprudência e pedido — sem valores em R$.',
+  },
+  {
     numero: 'multas_convencionais',
     nome: 'Multas convencionais',
     campo: 'BLOCO_MULTAS_CONVENCIONAIS',
