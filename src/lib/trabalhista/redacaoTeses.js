@@ -53,31 +53,17 @@ export const ESPECIALISTAS = [
     nome: 'Jornada e horas extras',
     campo: 'BLOCO_JORNADA',
     ativo: (d, c) => !!(d.escala_12x36 || d.escala_4x2 || c.jornada_horario || d.folgas_trabalhadas),
-    // Instrução dinâmica: só instrua os tópicos extras quando as flags
-    // correspondentes estiverem acesas (evita a IA escrever tese não aplicável).
-    instrucao: (d, c) => {
-      let base =
-        'Escreva APENAS o bloco de jornada: descaracterização da escala relatada (ex.: 12x36 – Súmula 85), intervalo intrajornada (art. 71 CLT), minutos residuais antes/depois e DSR/folgas trabalhadas — tratando EXCLUSIVAMENTE a escala efetivamente relatada. NÃO escreva dano moral, rescisão nem enquadramento funcional.';
-      const extras = [];
-      if (d.periculosidade) {
-        extras.push(
-          'Adicional de periculosidade incidente sobre as horas extras e o adicional noturno (Súmula 132, I do TST e OJ SDI-1 nº 259 do E. TST) — peça as diferenças de todo o período contratual, com reflexos em DSR, aviso prévio, férias +1/3, 13º e FGTS +40%.'
-        );
-      }
-      if (d.adicional_noturno) {
-        extras.push(
-          'Adicional noturno e hora noturna reduzida (art. 73 da CLT) — peça as diferenças do percentual e da redução da hora noturna, com reflexos em DSR, aviso prévio, férias +1/3, 13º e FGTS +40%.'
-        );
-      }
-      if (d.folgas_trabalhadas) {
-        extras.push(
-          'Horas extras em folgas e feriados com adicional de 100% (Súmula 444 do TST) — peça o pagamento em dobro do descanso nos feriados laborados, com reflexos.'
-        );
-      }
-      return extras.length ? `${base}\nTÓPICOS ADICIONAIS (conforme os dados do caso): ${extras.join(' ')}` : base;
-    },
+    // Escopo (adaptado do app de referência, caminho conservador): a IA redige
+    // APENAS a narrativa fática da seção "DA JORNADA DE TRABALHO". A
+    // descaracterização da escala (12x36/4x2, com ementas reais do TST), o art.
+    // 71, o adicional noturno, os 10 minutos, a periculosidade e o DSR permanecem
+    // DETERMINÍSTICOS no template (seções condicionais próprias) — não são
+    // reescritos pela IA, para preservar os precedentes verificados e as travas
+    // de categoria.
+    instrucao:
+      'Escreva APENAS a narrativa fática da seção "DA JORNADA DE TRABALHO": descreva, com base nos dados do caso, o horário e a escala efetivamente cumpridos, a prorrogação/extrapolação habitual da jornada e a ausência de contraprestação, em prosa jurídica fluida. Contextualize também, de forma sucinta, o pedido de diferenças de horas extras excedentes da 8ª diária e 44ª semanal (com o adicional convencional real da CCT; nunca presuma percentual — na falta, use [adicional conforme CCT]). NÃO escreva a descaracterização da escala (12x36/4x2), o art. 71 (intervalo), o adicional noturno, os 10 minutos de descanso, a periculosidade nem o DSR — essas seções são geradas deterministicamente pelo template. NÃO trate de rescisão, dano moral nem enquadramento funcional.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em jornada de trabalho. Redija o bloco de jornada em prosa jurídica fluida e natural, organizado nos quatro blocos legais (fatos, fundamento legal, jurisprudência, pedido), evitando o padrão enlatado repetitivo.',
+      'Você é advogado(a) trabalhista especialista em jornada de trabalho. Redija a narrativa fática da jornada em prosa jurídica fluida e natural (fatos e enquadramento inicial das horas extras), sem reproduzir a descaracterização da escala nem os demais subtópicos, que já constam do modelo.',
   },
   {
     numero: 'dano_moral',
