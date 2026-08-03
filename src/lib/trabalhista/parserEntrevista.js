@@ -277,6 +277,14 @@ export async function extrairCasoDeTexto(texto, fileUrls) {
 
 ${blocoTexto}${blocoArquivos}
 
+=== REGRAS DE EXTRAÇÃO CRÍTICAS (HARD RULES — sob pena de falha) ===
+1. COMPETÊNCIA TERRITORIAL: Separe rigorosamente DOIS endereços distintos:
+   - recl_endereco = endereço RESIDENCIAL do reclamante (onde mora).
+   - local_prestacao = endereço da empresa TOMADORA de serviços (2ª reclamada/recl2_logradouro). É ESTE que define a competência territorial da peça (art. 651 CLT). NUNCA confunda os dois; NUNCA use a residência do autor como local de prestação.
+2. FOLGAS TRABALHADAS (FTs): Se a entrevista mencionar labor em dias de folga, marque tem_ft = true OBRIGATORIAMENTE. O acionamento de tem_ft exigirá a cobrança dos reflexos de Vale-Transporte (tem_vale_transporte) e Auxílio-Alimentação (tem_auxilio_alimentação) correspondentes a esses dias — ative ambas as flags quando houver FTs e o benefício era fornecido normalmente.
+3. GÊNERO: Defina recl_genero = 'M' (masculino) ou 'F' (feminino) com base no nome e dados (ex.: "brasileiro/solteiro" → M; "brasileira/casada" → F). Isso guia a concordância de toda a redação.
+4. E-MAIL: Se o e-mail pessoal não for fornecido, NÃO retorne string vazia — omita o campo (o sistema aciona a frase de contingência). Se houver qualquer e-mail pessoal (gmail/hotmail/outlook/yahoo etc.), extraia SEMPRE.
+
 === REGRAS DE EXTRAÇÃO ===
 
 DADOS BÁSICOS:
