@@ -10,7 +10,8 @@ import { blocoRegrasCriticas, regiaoTrtPorMunicipio } from './regrasCriticas';
 import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { BLOCO_REGRAS_QUALIDADE } from './regrasQualidadeFav';
 import { invokeLLMComRetry } from './llmRetry';
-import { aplicarFormatacaoPadrao, aplicarFechoDeterministico, removerPedidosZerados, esqueletoDoModelo } from './formatacaoPeca';
+import { aplicarFormatacaoPadrao, aplicarFechoDeterministico, removerPedidosZerados, esqueletoDoModelo, injetarEmailPessoal, flexionarGeneroMasculino } from './formatacaoPeca';
+import { extrairDeterministico } from './extracaoDeterministica';
 import { traceAiCall } from '@/lib/sessionTrace';
 import {
   consultarCnpj,
@@ -663,7 +664,7 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   }
   // Extração estruturada do caso (parser) para alimentar o cálculo determinístico.
   if (texto && texto.trim()) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
-  const [dadosReceita, dadosCep, dadosDatajud, caso] = await Promise.all([
+  const [dadosReceita, dadosCep, dadosDatajud, casoRaw] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
@@ -673,6 +674,21 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
         }).catch(() => ({}))
       : Promise.resolve({}),
   ]);
+  // Merge determinístico (regex) sobre o caso da IA — garante e-mail pessoal
+  // e gênero do reclamante mesmo quando o parser da IA não os extraiu.
+  const caso = { ...casoRaw };
+  const casoDet = texto && texto.trim() ? extrairDeterministico(texto) : {};
+  for (const k of Object.keys(casoDet || {})) {
+    const v = casoDet[k];
+    if (v === null || v === undefined || v === '') continue;
+    const atual = caso[k];
+    const vazio = atual === undefined || atual === null || atual === '' || (Array.isArray(atual) && !atual.length);
+    if (vazio) caso[k] = v;
+  }
+  if (!caso.recl_genero) {
+    caso.recl_genero = /\bbrasileira\b|\bnascida\b|\bsolteira\b|\bcasada\b|\bfilha\b/i.test(texto || '') ? 'F'
+      : /\bbrasileiro\b|\bnascido\b|\bsolteiro\b|\bcasado\b|\bfilho\b/i.test(texto || '') ? 'M' : undefined;
+  }
 
   // Convenção coletiva (CCT) vigente na data do fato — cláusulas reais como contexto para a IA.
   let dadosCct = null;
@@ -763,7 +779,21 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // uma segunda chamada de IA para reler o que ela mesma acabou de escrever.
   // Só fazemos um parse determinístico e removemos o comentário do HTML final.
   const { valores, htmlSemComentario } = extrairValoresPedidos(htmlSemPedidos);
-  const htmlLimpo = htmlSemComentario;
+  let htmlLimpo = htmlSemComentario;
+
+  // Gênero: corrige flexões femininas residuais para reclamante MASCULINO.
+  if (caso.recl_genero === 'M') {
+    htmlLimpo = flexionarGeneroMasculino(htmlLimpo);
+  }
+  // E-mail pessoal: injeta deterministicamente no preâmbulo e no Juízo 100%
+  // Digital se a IA o omitiu (e-mail vem da extração determinística).
+  if (caso.recl_email) {
+    htmlLimpo = injetarEmailPessoal(htmlLimpo, caso.recl_email);
+  }
+
+  // Valor da causa: somado por código a partir do array PEDIDOS_VALORES que a
+  // própria IA embute na resposta (um número por pedido principal, já com
+  // reflexos). Confere com a soma dos totais de cada item exibidos no rol.
   let valorCausa = null;
   if (valores.length) {
     valorCausa = round2(valores.reduce((soma, v) => soma + v, 0));
