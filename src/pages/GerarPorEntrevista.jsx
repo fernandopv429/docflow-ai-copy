@@ -7,21 +7,17 @@ import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
 import SessionLogsModal from '@/components/SessionLogsModal';
 import DocumentReviewPreview from '@/components/DocumentReviewPreview';
-import { exportarDocxTemplate } from '@/lib/preencherDocxTemplate';
+import { exportarHtmlDocx } from '@/lib/trabalhista/exportarHtmlDocx';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
 import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
 import {
   conversarEntrevista,
-  gerarDadosPeca,
+  gerarPecaPadrao,
+  carregarModeloPadrao,
   verificarCoerencia,
 } from '@/lib/trabalhista/modelosReferencia';
-import {
-  carregarEsqueletoTemplate,
-  preencherEsqueleto,
-  textoDaPeca,
-} from '@/lib/trabalhista/previewTemplate';
 import ConfirmacaoGeracao from '@/components/ConfirmacaoGeracao';
 
 export default function GerarPorEntrevista() {
@@ -42,16 +38,18 @@ export default function GerarPorEntrevista() {
   const [documentSources, setDocumentSources] = useState([]);
   const [attrs, setAttrs] = useState(null);
   const [config, setConfig] = useState(null);
+  const [modeloPadrao, setModeloPadrao] = useState(null);
   const [ultimaGeracao, setUltimaGeracao] = useState(null);
 
   // Documento vivo (painel à direita) — preview do template .docx preenchido
   const [docHtml, setDocHtml] = useState('');
   const endRef = useRef(null);
 
-  const temTemplate = !!config?.template_docx_url;
+  const temTemplate = !!modeloPadrao?.html;
 
   useEffect(() => {
     base44.entities.IntegracaoConfig.list('-updated_date', 1).then((l) => setConfig(l?.[0] || null)).catch(() => {});
+    carregarModeloPadrao().then(setModeloPadrao).catch(() => setModeloPadrao(null));
   }, []);
 
   useEffect(() => {
@@ -96,29 +94,17 @@ export default function GerarPorEntrevista() {
     setGenerating(true);
     try {
       const geracaoTexto = opts.texto ?? userText;
-      const { dados, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarDadosPeca({
+      const { html, valorCausa, pedidos, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarPecaPadrao({
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
-        redigirIA: true,
+        modeloPadrao,
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
 
-      // Preview a partir do próprio template .docx (fonte única)
-      let html = '';
-      let documentoTexto = '';
-      if (config?.template_docx_url) {
-        try {
-          const esqueleto = await carregarEsqueletoTemplate(config.template_docx_url);
-          html = preencherEsqueleto(esqueleto, dados, { highlight: true });
-          documentoTexto = textoDaPeca(esqueleto, dados);
-        } catch (e) {
-          console.error(e);
-          setMessages((m) => [...m, { role: 'assistant', text: `Não consegui carregar o template .docx para o preview: ${e.message || 'verifique o arquivo em Configurações.'}` }]);
-        }
-      }
+      const documentoTexto = (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
       setDocHtml(html);
-      setUltimaGeracao({ caso, calculos, dados, dadosReceita });
+      setUltimaGeracao({ html, valorCausa, caso, calculos, dadosReceita });
       setReviewConfirmed(false);
 
       const retornos = [
@@ -128,7 +114,7 @@ export default function GerarPorEntrevista() {
         caso && Object.keys(caso).length && { role: 'tool_result', title: 'Dados analisados e extraídos pela IA', text: JSON.stringify(caso, null, 2) },
         calculos?.length && { role: 'tool_result', title: 'Retorno dos cálculos determinísticos', text: JSON.stringify(calculos, null, 2) },
         dadosCct?.clausulas?.length && { role: 'tool_result', title: `Cláusulas da CCT aplicável${dadosCct.meta?.titulo ? ` — ${dadosCct.meta.titulo}` : ''}`, text: JSON.stringify(dadosCct.clausulas.map((c) => ({ clausula: `${c.clausula_ref} — ${c.clausula_titulo}`, cct: c.titulo, conteudo: c.conteudo, fonte: c.fonte_url })), null, 2) },
-        { role: 'tool_result', title: 'Dados e flags aplicados ao template', text: JSON.stringify(dados, null, 2) },
+        { role: 'tool_result', title: 'Valor da causa e rol de pedidos', text: JSON.stringify({ valorCausa, pedidos }, null, 2) },
         modeloSemelhante && { role: 'tool_result', title: 'Modelo de referência selecionado', text: JSON.stringify(modeloSemelhante, null, 2) },
         {
           role: 'tool_result',
@@ -147,12 +133,13 @@ export default function GerarPorEntrevista() {
       if (retornos.length) setMessages((m) => [...m, ...retornos]);
 
       const verificados = (dadosReceita || []).filter((d) => !d.erro);
-      let nota = temTemplate
-        ? 'Dados aplicados ao template. Confira os campos destacados no documento ao lado.'
-        : 'Dados extraídos. Envie o template .docx em Configurações para gerar e exportar a petição.';
+      let nota = modeloPadrao
+        ? 'Petição redigida pela IA. Confira o documento ao lado e confirme a revisão antes de exportar.'
+        : 'Defina o modelo padrão em Configurações para gerar a petição.';
       if (verificados.length) {
         nota += ` CNPJ(s) confirmado(s) na Receita: ${verificados.map((d) => `${d.razao_social} (${d.cnpj})`).join('; ')}.`;
       }
+      if (valorCausa != null) nota += `\n\nValor da causa: ${formatBRL(valorCausa)}.`;
       const comValor = (calculos || []).filter((c) => c.valor != null);
       if (comValor.length) {
         nota += `\n\nCálculos determinísticos (por código, sem IA):\n${comValor.map((c) => `• ${c.item}: ${formatBRL(c.valor)}`).join('\n')}`;
@@ -162,7 +149,7 @@ export default function GerarPorEntrevista() {
       // Verificação de coerência jurídica (LLM audita, não reescreve)
       setMessages((m) => [...m, { role: 'tool', text: 'Verificando coerência jurídica da peça...' }]);
       try {
-        const verif = await verificarCoerencia({ texto: geracaoTexto, caso, dados, documentoTexto });
+        const verif = await verificarCoerencia({ texto: geracaoTexto, caso, dados: caso, documentoTexto });
         const alertas = verif?.alertas || [];
         const icone = { BLOQUEANTE: '⛔', ATENCAO: '⚠️', INFO: 'ℹ️' };
         const cabecalho = `Verificação de coerência — status: ${verif?.status || 'concluída'}.`;
@@ -296,10 +283,10 @@ export default function GerarPorEntrevista() {
     if (!temTemplate || !ultimaGeracao || !reviewConfirmed || exporting) return;
     setExporting(true);
     try {
-      await exportarDocxTemplate(config.template_docx_url, ultimaGeracao.dados, 'Petição inicial');
+      await exportarHtmlDocx(ultimaGeracao.html, 'Petição inicial');
     } catch (err) {
       console.error(err);
-      window.alert(`Não foi possível exportar o documento: ${err?.message || 'verifique o template .docx e as tags.'}`);
+      window.alert(`Não foi possível exportar o documento: ${err?.message || 'verifique a petição gerada.'}`);
     } finally {
       setExporting(false);
     }
@@ -315,7 +302,7 @@ export default function GerarPorEntrevista() {
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-[#202124]">Gerar por Entrevista</h1>
           <p className="text-xs text-[#5f6368] truncate">
-            Converse à esquerda; a petição preenche o template ao lado e é exportada fiel ao .docx.
+            Converse à esquerda; a IA redige a petição ao lado e exporta em .docx editável.
           </p>
         </div>
         <button
@@ -332,14 +319,14 @@ export default function GerarPorEntrevista() {
 
       {/* Barra do template .docx */}
       <div className="flex flex-wrap items-center gap-2 px-6 py-2 border-b border-[#f1f3f4] bg-white flex-shrink-0">
-        <span className="text-xs text-[#5f6368]">Template .docx:</span>
+        <span className="text-xs text-[#5f6368]">Modelo padrão:</span>
         {temTemplate ? (
           <span className="text-xs font-medium text-[#0b8043] truncate max-w-[420px]">
-            {config.template_docx_nome || 'enviado'}
+            {modeloPadrao?.titulo || 'configurado'}
           </span>
         ) : (
           <Link to="/modelos" className="text-xs font-medium text-[#c5221f] hover:underline">
-            nenhum — enviar em Configurações
+            nenhum — definir em Configurações
           </Link>
         )}
         {attrs && (attrs.funcao || attrs.tipo_dispensa) && (
@@ -482,7 +469,7 @@ export default function GerarPorEntrevista() {
               <button
                 onClick={() => gerarMinuta()}
                 disabled={generating}
-                title="Reaplicar os dados ao template"
+                title="Regenerar a petição com a IA"
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-[#dadce0] text-[#3c4043] rounded-lg text-xs font-medium hover:bg-[#f1f3f4] transition-colors disabled:opacity-40"
               >
                 <RefreshCw className="w-3.5 h-3.5" /> Atualizar
@@ -504,7 +491,7 @@ export default function GerarPorEntrevista() {
             <button
               onClick={exportar}
               disabled={!temTemplate || !ultimaGeracao || !reviewConfirmed || exporting}
-              title={!temTemplate ? 'Envie o template .docx em Configurações' : !reviewConfirmed ? 'Confirme a revisão antes de exportar' : 'Exportar DOCX fiel ao modelo'}
+              title={!temTemplate ? 'Defina o modelo padrão em Configurações' : !reviewConfirmed ? 'Confirme a revisão antes de exportar' : 'Exportar DOCX da petição'}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b8043] text-white rounded-lg text-xs font-medium hover:bg-[#0a7038] transition-colors disabled:opacity-40"
             >
               {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
@@ -516,9 +503,9 @@ export default function GerarPorEntrevista() {
             {!temTemplate ? (
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <AlertTriangle className="w-10 h-10 text-[#e0a800] mb-3" />
-                <p className="text-sm text-[#5f6368]">Nenhum template .docx configurado.</p>
+                <p className="text-sm text-[#5f6368]">Nenhum modelo padrão configurado.</p>
                 <p className="text-xs text-[#9aa0a6] mt-1">
-                  Envie o modelo oficial (marcado com as tags) em{' '}
+                  Defina o modelo padrão do escritório em{' '}
                   <Link to="/modelos" className="text-[#1a73e8] hover:underline">Configurações</Link>.
                 </p>
               </div>
@@ -528,7 +515,7 @@ export default function GerarPorEntrevista() {
               <div className="h-full flex flex-col items-center justify-center text-center">
                 <FileText className="w-10 h-10 text-[#dadce0] mb-3" />
                 <p className="text-sm text-[#5f6368]">A petição preenchida aparecerá aqui.</p>
-                <p className="text-xs text-[#9aa0a6] mt-1">Envie a entrevista à esquerda — o template será preenchido automaticamente.</p>
+                <p className="text-xs text-[#9aa0a6] mt-1">Envie a entrevista à esquerda — a petição será redigida pela IA automaticamente.</p>
               </div>
             )}
             {generating && docHtml && (
