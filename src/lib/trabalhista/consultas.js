@@ -148,14 +148,58 @@ export function categoriaCct(caso = {}, attrs = {}) {
   return 'terceirizados'; // porteiro / controlador de acesso / SINDEEPRES (padrão)
 }
 
-export async function consultarCct({ pergunta, categoria, municipio, data_fato, limite = 4 }) {
+export async function consultarCct({ pergunta, categoria, data_fato, municipio, uf, limite = 4 }) {
   try {
-    const resp = await base44.functions.invoke('cct', { pergunta, categoria, municipio, data_fato, limite });
+    const resp = await base44.functions.invoke('cct', { pergunta, categoria, data_fato, municipio, uf, limite });
     const data = resp?.data ?? resp;
     return { pergunta, resultados: Array.isArray(data?.resultados) ? data.resultados : [], erro: data?.erro };
   } catch (e) {
     return { pergunta, resultados: [], erro: 'indisponível' };
   }
+}
+
+// Perguntas base (temas presentes em praticamente toda petição) + condicionais
+// (só entram quando a tese existe no caso, para trazer cláusula REAL da base).
+const CCT_PERGUNTAS_BASE = [
+  'adicional noturno e hora noturna reduzida',
+  'auxílio alimentação / refeição e vale-transporte',
+  'multa convencional por descumprimento de cláusula',
+  'adicional de horas extras e intervalo intrajornada',
+];
+
+const CCT_PERGUNTAS_CONDICIONAIS = [
+  [/desvio de fun/i, 'desvio de função e a multa convencional correspondente'],
+  [/ac[uú]mulo de fun/i, 'acúmulo de função e a multa convencional correspondente'],
+  [/periculos/i, 'adicional de periculosidade e sua integração nas horas extras'],
+  [/insalubr/i, 'adicional de insalubridade'],
+  [/10 minutos|descanso sentad/i, 'os 10 minutos de descanso sentado durante a jornada'],
+  [/12x36|escala|jornada|hora[s]? extra/i, 'compensação de jornada, escala 12x36 e prorrogação'],
+  [/folga|dsr|descanso semanal|feriado/i, 'trabalho em folgas, feriados e descanso semanal remunerado'],
+  [/dano moral|ass[eé]dio/i, 'garantias e direitos do trabalhador previstos na convenção'],
+  [/gratifica[çc][aã]o|condutor|motorista/i, 'gratificação de função do condutor de veículo'],
+  [/sal[aá]rio normativo|piso/i, 'piso salarial / salário normativo da categoria'],
+  [/assiduidade/i, 'prêmio de assiduidade e seu valor previsto em convenção'],
+];
+
+export function perguntasCct(caso = {}, attrs = {}) {
+  const contexto = [
+    ...(attrs.teses || []),
+    caso.acumulo_funcao,
+    caso.funcao,
+    caso.jornada_horario,
+    caso.tem_desvio && 'desvio de função',
+    caso.tem_acumulo && 'acúmulo de função',
+    caso.tem_periculosidade && 'periculosidade',
+    caso.tem_insalubridade && 'insalubridade',
+    caso.tem_adic_noturno && 'adicional noturno',
+    caso.tem_ft && 'folgas trabalhadas',
+    caso.tem_dano_moral && 'dano moral',
+    caso.tem_assiduidade && 'assiduidade',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const condicionais = CCT_PERGUNTAS_CONDICIONAIS.filter(([re]) => re.test(contexto)).map(([, p]) => p);
+  return [...new Set([...CCT_PERGUNTAS_BASE, ...condicionais])];
 }
 
 // Município onde o reclamante prestava serviços — define a base territorial
@@ -167,25 +211,19 @@ function municipioDeLocal(local) {
   return m ? m[1].trim().replace(/[.,;]+$/, '') : '';
 }
 
-// Perguntas padrão para reunir as cláusulas mais usadas na peça.
-const CCT_PERGUNTAS = [
-  'adicional noturno e hora noturna reduzida',
-  'auxílio alimentação / refeição e vale-transporte',
-  'multa convencional por descumprimento de cláusula',
-  'adicional de horas extras e intervalo intrajornada',
-];
-
-export async function enriquecerCct(caso, attrs, config) {
+export async function enriquecerCct(caso, attrs, config, local = {}) {
   if (!config?.cct_ativo) return null;
   const categoria = config.cct_categoria || categoriaCct(caso, attrs);
-  const municipio = municipioDeLocal(caso?.local_prestacao) || caso?.comarca || '';
   const data_fato = caso?.data_rescisao || caso?.data_admissao || undefined;
-  const key = runtimeCacheKey({ categoria, municipio, data_fato });
+  const municipio = local.municipio || municipioDeLocal(caso?.local_prestacao) || caso?.comarca || undefined;
+  const uf = local.uf || undefined;
+  const perguntas = perguntasCct(caso, attrs);
+  const key = runtimeCacheKey({ categoria, data_fato, municipio, uf, perguntas });
   return withRuntimeCache('cct', key, async () => {
     const buscas = await Promise.all(
-      CCT_PERGUNTAS.map((pergunta) => consultarCct({ pergunta, categoria, municipio, data_fato, limite: 3 }))
+      perguntas.map((pergunta) => consultarCct({ pergunta, categoria, data_fato, municipio, uf, limite: 3 }))
     );
-    // dedup por cláusula (clausula_ref + título da CCT)
+    // dedup por cláusula (título da CCT + referência da cláusula)
     const vistos = new Set();
     const clausulas = [];
     for (const b of buscas) {
@@ -200,6 +238,9 @@ export async function enriquecerCct(caso, attrs, config) {
     return {
       categoria,
       data_fato,
+      municipio,
+      uf,
+      perguntas,
       clausulas,
       meta: top ? {
         titulo: top.titulo,

@@ -12,7 +12,23 @@ import { BLOCO_REGRAS_QUALIDADE } from './regrasQualidadeFav';
 import { invokeLLMComRetry } from './llmRetry';
 import { aplicarFormatacaoPadrao, aplicarFechoDeterministico, removerPedidosZerados, esqueletoDoModelo } from './formatacaoPeca';
 import { traceAiCall } from '@/lib/sessionTrace';
-import { consultarCnpj, consultarCep, CONFIG_INTEGRACOES_PADRAO } from './consultas';
+import {
+  consultarCnpj,
+  enriquecerCnpjs,
+  extrairCnpjs,
+  consultarCep,
+  enriquecerCeps,
+  extrairCeps,
+  CONFIG_INTEGRACOES_PADRAO,
+  carregarConfigIntegracoes,
+  montarTermosDatajud,
+  consultarDatajud,
+  enriquecerDatajud,
+  categoriaCct,
+  consultarCct,
+  perguntasCct,
+  enriquecerCct,
+} from './consultas';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -380,31 +396,6 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
   return { ...resposta, reply, atributos, pronto_para_gerar: pronto, faltando, dadosReceita };
 }
 
-// ============================================================
-// Consulta de CNPJ na Receita Federal (BrasilAPI) — determinística.
-// Usada sempre que houver CNPJ, para preencher a qualificação das
-// reclamadas com dados oficiais (sem alucinação da IA).
-// ============================================================
-const CNPJ_RE = /\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g;
-
-export function extrairCnpjs(texto) {
-  const encontrados = new Set();
-  for (const m of (texto || '').matchAll(CNPJ_RE)) {
-    const d = m[0].replace(/\D/g, '');
-    if (d.length === 14) encontrados.add(d);
-  }
-  return [...encontrados];
-}
-
-export async function enriquecerCnpjs(cnpjs) {
-  const unicos = [
-    ...new Set((cnpjs || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 14)),
-  ];
-  if (!unicos.length) return [];
-  const key = [...unicos].sort().join(',');
-  return withRuntimeCache('cnpj', key, () => Promise.all(unicos.map(consultarCnpj)), { ttlMs: 60 * 60 * 1000 });
-}
-
 function blocoReceita(dados) {
   if (!dados?.length) return '';
   const linhas = dados.map((d) =>
@@ -415,36 +406,6 @@ function blocoReceita(dados) {
   return `\n\nDADOS OFICIAIS DAS RECLAMADAS (verificados na Receita Federal via BrasilAPI — USE ESTES dados exatos na qualificação das reclamadas, com a razão social e o endereço oficiais):\n${linhas.join('\n')}`;
 }
 
-// ============================================================
-// Consulta de CEP (ViaCEP, com fallback BrasilAPI) — determinística.
-// Completa o endereço do reclamante e do local de prestação (competência).
-// ============================================================
-const CEP_LABEL_RE = /CEP:?\s*(\d{5}-?\d{3})/gi;
-const CEP_DASH_RE = /\b\d{5}-\d{3}\b/g;
-
-export function extrairCeps(texto) {
-  const encontrados = new Set();
-  const t = texto || '';
-  for (const m of t.matchAll(CEP_LABEL_RE)) {
-    const d = m[1].replace(/\D/g, '');
-    if (d.length === 8) encontrados.add(d);
-  }
-  for (const m of t.matchAll(CEP_DASH_RE)) {
-    const d = m[0].replace(/\D/g, '');
-    if (d.length === 8) encontrados.add(d);
-  }
-  return [...encontrados];
-}
-
-export async function enriquecerCeps(ceps) {
-  const unicos = [
-    ...new Set((ceps || []).map((c) => (c || '').replace(/\D/g, '')).filter((d) => d.length === 8)),
-  ];
-  if (!unicos.length) return [];
-  const key = [...unicos].sort().join(',');
-  return withRuntimeCache('cep', key, () => Promise.all(unicos.map(consultarCep)), { ttlMs: 60 * 60 * 1000 });
-}
-
 function blocoCeps(dados) {
   if (!dados?.length) return '';
   const linhas = dados.map((d) =>
@@ -453,59 +414,6 @@ function blocoCeps(dados) {
       : `- CEP ${d.cep}: ${[d.logradouro, d.bairro, [d.municipio, d.uf].filter(Boolean).join('/')].filter(Boolean).join(', ')}.`
   );
   return `\n\nENDEREÇOS VERIFICADOS POR CEP (ViaCEP — use para completar logradouro/bairro/município/UF na qualificação; o município orienta a Vara do Trabalho e o UF o TRT da competência):\n${linhas.join('\n')}`;
-}
-
-// ============================================================
-// Configuração das integrações (liga/desliga cada tool). Singleton.
-// ============================================================
-export async function carregarConfigIntegracoes() {
-  return withRuntimeCache('config-integracoes', 'atual', async () => {
-    try {
-      const lista = await base44.entities.IntegracaoConfig.list('-updated_date', 1);
-      return { ...CONFIG_INTEGRACOES_PADRAO, ...(lista?.[0] || {}) };
-    } catch (e) {
-      return { ...CONFIG_INTEGRACOES_PADRAO };
-    }
-  }, { ttlMs: 5 * 60 * 1000 });
-}
-
-// ============================================================
-// Consulta ao DataJud (CNJ) — jurisprudência/processos por tema.
-// Vai por FUNÇÃO DE BACKEND (base44.functions.invoke('datajud')),
-// porque o DataJud não libera CORS para o navegador.
-// A busca é montada por palavras-chave/contexto da entrevista.
-// ============================================================
-export function montarTermosDatajud(attrs) {
-  const termos = [...((attrs && attrs.teses) || [])];
-  if (!termos.length && attrs?.funcao) termos.push(attrs.funcao);
-  return [...new Set(termos.map((t) => (t || '').trim()).filter(Boolean))].slice(0, 4);
-}
-
-export async function consultarDatajud({ termo, tribunal = 'trt2', size = 5 }) {
-  try {
-    const resp = await base44.functions.invoke('datajud', { termo, tribunal, size });
-    const data = resp?.data ?? resp;
-    const hits = data?.hits || data?.processos || [];
-    return { termo, hits: Array.isArray(hits) ? hits : [] };
-  } catch (e) {
-    return { termo, erro: 'indisponível' };
-  }
-}
-
-export async function enriquecerDatajud(attrs, config) {
-  if (!config?.datajud_ativo) return [];
-  const termos = montarTermosDatajud(attrs);
-  if (!termos.length) return [];
-  const key = runtimeCacheKey({ termos, tribunal: config.datajud_tribunal, size: config.datajud_size });
-  return withRuntimeCache('datajud', key, () => Promise.all(
-    termos.map((termo) =>
-      consultarDatajud({
-        termo,
-        tribunal: config.datajud_tribunal || 'trt2',
-        size: config.datajud_size || 5,
-      })
-    )
-  ), { ttlMs: 30 * 60 * 1000 });
 }
 
 function blocoDatajud(resultados) {
@@ -521,118 +429,6 @@ function blocoDatajud(resultados) {
     return `- Tema "${r.termo}": ${exemplos.join('; ')}`;
   });
   return `\n\nCONTEXTO JURISPRUDENCIAL (DataJud/CNJ — mostra que o tema é recorrente no tribunal; use só como reforço argumentativo, NÃO cite números de processo específicos sem conferência humana):\n${linhas.join('\n')}`;
-}
-
-// ============================================================
-// Consulta de Convenções Coletivas (CCT) — cct-api / pgvector.
-// Vai por FUNÇÃO DE BACKEND (base44.functions.invoke('cct')), pois a
-// API externa não libera CORS e a chave fica em SECRET (CCT_API_KEY) no
-// servidor. Fornece CLÁUSULAS REAIS como contexto para a IA — a IA nunca
-// inventa cláusula; usa só o que a base retornar.
-// ============================================================
-export function categoriaCct(caso = {}, attrs = {}) {
-  const t = `${caso.funcao || attrs.funcao || ''} ${caso.sindicato || ''}`.toLowerCase();
-  if (/vigilante|seevissp|sesvesp|segurança/.test(t)) return 'vigilancia';
-  if (/asseio|limpeza|conserva|siemaco|seac/.test(t)) return 'asseio_conservacao';
-  return 'terceirizados'; // porteiro / controlador de acesso / SINDEEPRES (padrão)
-}
-
-export async function consultarCct({ pergunta, categoria, data_fato, municipio, uf, limite = 4 }) {
-  try {
-    const resp = await base44.functions.invoke('cct', { pergunta, categoria, data_fato, municipio, uf, limite });
-    const data = resp?.data ?? resp;
-    return { pergunta, resultados: Array.isArray(data?.resultados) ? data.resultados : [], erro: data?.erro };
-  } catch (e) {
-    return { pergunta, resultados: [], erro: 'indisponível' };
-  }
-}
-
-// Perguntas sempre feitas (temas presentes em praticamente toda petição)
-const CCT_PERGUNTAS_BASE = [
-  'adicional noturno e hora noturna reduzida',
-  'auxílio alimentação / refeição e vale-transporte',
-  'multa convencional por descumprimento de cláusula',
-  'adicional de horas extras e intervalo intrajornada',
-];
-
-// Perguntas condicionais: só entram quando a tese existe no caso, para trazer
-// cláusula REAL da base (antes essas teses ficavam sem fundamento convencional).
-const CCT_PERGUNTAS_CONDICIONAIS = [
-  [/desvio de fun/i, 'desvio de função e a multa convencional correspondente'],
-  [/ac[uú]mulo de fun/i, 'acúmulo de função e a multa convencional correspondente'],
-  [/periculos/i, 'adicional de periculosidade e sua integração nas horas extras'],
-  [/insalubr/i, 'adicional de insalubridade'],
-  [/10 minutos|descanso sentad/i, 'os 10 minutos de descanso sentado durante a jornada'],
-  [/12x36|escala|jornada|hora[s]? extra/i, 'compensação de jornada, escala 12x36 e prorrogação'],
-  [/folga|dsr|descanso semanal|feriado/i, 'trabalho em folgas, feriados e descanso semanal remunerado'],
-  [/dano moral|ass[eé]dio/i, 'garantias e direitos do trabalhador previstos na convenção'],
-  [/gratifica[çc][aã]o|condutor|motorista/i, 'gratificação de função do condutor de veículo'],
-  [/sal[aá]rio normativo|piso/i, 'piso salarial / salário normativo da categoria'],
-  [/assiduidade/i, 'prêmio de assiduidade e seu valor previsto em convenção'],
-];
-
-export function perguntasCct(caso = {}, attrs = {}) {
-  const contexto = [
-    ...(attrs.teses || []),
-    caso.acumulo_funcao,
-    caso.funcao,
-    caso.jornada_horario,
-    caso.tem_desvio && 'desvio de função',
-    caso.tem_acumulo && 'acúmulo de função',
-    caso.tem_periculosidade && 'periculosidade',
-    caso.tem_insalubridade && 'insalubridade',
-    caso.tem_adic_noturno && 'adicional noturno',
-    caso.tem_ft && 'folgas trabalhadas',
-    caso.tem_dano_moral && 'dano moral',
-    caso.tem_assiduidade && 'assiduidade',
-  ]
-    .filter(Boolean)
-    .join(' ');
-  const condicionais = CCT_PERGUNTAS_CONDICIONAIS.filter(([re]) => re.test(contexto)).map(([, p]) => p);
-  return [...new Set([...CCT_PERGUNTAS_BASE, ...condicionais])];
-}
-
-export async function enriquecerCct(caso, attrs, config, local = {}) {
-  if (!config?.cct_ativo) return null;
-  const categoria = config.cct_categoria || categoriaCct(caso, attrs);
-  const data_fato = caso?.data_rescisao || caso?.data_admissao || undefined;
-  const municipio = local.municipio || undefined;
-  const uf = local.uf || undefined;
-  const perguntas = perguntasCct(caso, attrs);
-  const key = runtimeCacheKey({ categoria, data_fato, municipio, uf, perguntas });
-  return withRuntimeCache('cct', key, async () => {
-    const buscas = await Promise.all(
-      perguntas.map((pergunta) => consultarCct({ pergunta, categoria, data_fato, municipio, uf, limite: 3 }))
-    );
-    // dedup por cláusula (título da CCT + referência da cláusula)
-    const vistos = new Set();
-    const clausulas = [];
-    for (const b of buscas) {
-      for (const r of b.resultados) {
-        const id = `${r.titulo}||${r.clausula_ref}`;
-        if (vistos.has(id)) continue;
-        vistos.add(id);
-        clausulas.push(r);
-      }
-    }
-    const top = clausulas[0] || null;
-    return {
-      categoria,
-      data_fato,
-      municipio,
-      uf,
-      perguntas,
-      clausulas,
-      meta: top ? {
-        titulo: top.titulo,
-        ano_base: top.ano_base,
-        vigencia_inicio: top.vigencia_inicio,
-        vigencia_fim: top.vigencia_fim,
-        sindicato_laboral: top.sindicato_laboral,
-        fonte_url: top.fonte_url,
-      } : null,
-    };
-  }, { ttlMs: 30 * 60 * 1000 });
 }
 
 function blocoCct(dadosCct) {
