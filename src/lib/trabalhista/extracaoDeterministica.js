@@ -39,9 +39,9 @@ const ESTADOS_CIVIS = /^(solteir[oa]|casad[oa]?|divorciad[oa]|separad[oa]|vi[úu
 // Rótulos de entrevista separados por espaços (não newlines). Sem isto, regexes
 // que capturam [^\n]+ engolem rótulos subsequentes (ex.: "Jornada: 5x2 ... HORAS
 // EXTRAS: ... GRATIFICAÇÃO: ..."), vazando texto bruto da entrevista no template.
-// Rótulos precedidos por 2+ espaços ou newline — evita falsos matches em
-// palavras dentro do valor (ex.: "vale-transporte" cortado como rótulo "VALE").
-const ROTULOS = /(?:\s{2,}|\n)(?:Admiss|Jornada|Sal[áa]|Remunera|DANO|GRATIFICA|AC[ÚU]MULO|HORAS|RESUMO|TEMPO|Sem\s+JUSTA|RESOLU|ENDERE|CNPJ|DATA|INTERVALO|INTRA|PERICUL|INSALUB|RITO|COMARCA|RECLAMAD|FOLGAS|VALE|AUX[ÍI]LIO|PIS|CTPS|RG\b|CPF|NASC|FILIA|RESID|DOMICIL|ESCALA|INTRAJORNADA|FUN[ÇC][ÃA]O|DIREITOS|ESTADO\s+CIVIL|NACIONALIDADE|TIPO|RESOLU|S[ée]rie)/i;
+// Aceita 1+ espaço antes do rótulo (pdfjs pode gerar apenas 1 espaço entre rótulos
+// na mesma linha) — o padrão anterior exigia 2+, falhando com o formato real do PDF.
+const ROTULOS = /(?:\s+|\n)(?:Admiss|Jornada|Sal[áa]|Remunera|DANO|GRATIFICA|AC[ÚU]MULO|HORAS|RESUMO|TEMPO|Sem\s+JUSTA|RESOLU|ENDERE|CNPJ|DATA|INTERVALO|INTRA|PERICUL|INSALUB|RITO|COMARCA|RECLAMAD|FOLGAS|VALE|AUX[ÍI]LIO|PIS|CTPS|RG\b|CPF|NASC|FILIA|RESID|DOMICIL|ESCALA|INTRAJORNADA|CARGO|FUN[ÇC][ÃA]O|DIREITOS|ESTADO\s+CIVIL|NACIONALIDADE|TIPO|RESOLU|S[ée]rie|Assinado\s+digitalmente)/i;
 function cortarAteRotulo(texto) {
   return String(texto || '').split(ROTULOS)[0].replace(/[.,;\s]+$/, '').trim();
 }

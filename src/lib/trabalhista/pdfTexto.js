@@ -46,13 +46,20 @@ async function extrairDeUmPdf(url) {
     texto += '\n';
   }
   await doc.destroy();
-  const temTexto = texto.replace(/\s/g, '').length > 40; // PDF escaneado ~sem texto
+  // "tem texto" = o PDF contém conteúdo de entrevista extraível (não apenas
+  // metadados/rodapé ZapSign). Quando verdadeiro, o PDF SAI da fila de visão da IA.
+  // Quando falso, o texto parcial ainda é incluído no retorno para o fallback regex,
+  // mas o PDF permanece na fila da IA de visão.
+  const temConteudoEntrevista = /CARGO|TEMPO\s+LABORADO|CNPJ|CPF|IDENTIFICAÇÃO|RECLAMAD|FATOS\s+NARRADOS|ENTREVISTA/i.test(texto);
+  const temTexto = texto.replace(/\s/g, '').length > 80 && temConteudoEntrevista;
   return { texto: texto.trim(), temTexto };
 }
 
 // Extrai texto de todos os PDFs. Retorna { texto, pdfsComTexto }.
-// pdfsComTexto: conjunto de URLs que puderam ser lidas como texto
-// (podem sair da fila de visão da IA — já foram "vistas" via texto).
+// pdfsComTexto: conjunto de URLs que puderam ser lidas como texto RICO
+// (saem da fila de visão da IA — já foram processadas via texto).
+// Mesmo PDFs que vão para a IA de visão têm seu texto parcial incluído
+// no retorno para o fallback determinístico (regex) poder usar o que houver.
 export async function extrairTextoPdfs(urls) {
   const urlsPdf = (urls || []).filter(ehPdf);
   if (!urlsPdf.length) return { texto: '', pdfsComTexto: new Set() };
@@ -61,10 +68,8 @@ export async function extrairTextoPdfs(urls) {
   for (const u of urlsPdf) {
     try {
       const { texto: t, temTexto } = await extrairDeUmPdf(u);
-      if (temTexto) {
-        texto += `\n\n${t}`;
-        comTexto.add(u);
-      }
+      if (t && t.trim()) texto += `\n\n${t}`;  // inclui sempre que houver qualquer texto
+      if (temTexto) comTexto.add(u);            // sai da fila de visão só se tem texto rico
     } catch { /* PDF ilegível — fica na fila de visão da IA */ }
   }
   return { texto: texto.trim(), pdfsComTexto: comTexto };

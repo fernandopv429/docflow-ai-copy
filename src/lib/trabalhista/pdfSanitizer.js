@@ -13,11 +13,11 @@ export function sanitizarTextoEntrevista(rawText) {
   t = t.replace(/Relatório de Assinaturas[\s\S]*?zapsign\.com\.br\s*/gi, '');
 
   // 2. Remove bloco de assinatura digital inline (rodapé de cada página).
-  // CRÍTICO: o regex anterior ia de "Assinado digitalmente" até "Lei 14.063/2020.",
-  // que aparece DEPOIS da seção FATOS NARRADOS — removendo os fatos junto!
-  // Agora para no timestamp "(UTC±XXXX)", preservando os fatos narrados.
-  t = t.replace(/Assinado digitalmente via ZapSign[\s\S]*?\(UTC[+-]\d+\)\s*/gi, '');
-  t = t.replace(/ZapSign\s*-\s*[a-f0-9-]+[\s\S]*?Lei 14\.063\/2020\.\s*/gi, '');
+  // O pdfjs pode colocar a assinatura NA MESMA LINHA que o último conteúdo da página.
+  // Capturamos só a parte da assinatura, da palavra "Assinado" até o fim da linha/timestamp.
+  t = t.replace(/\s*Assinado digitalmente via ZapSign[^\n]*?\(UTC[+-]\d+\)[^\n]*/gi, '');
+  // Remove rodapé "ZapSign - UUID | Documento assinado..." (aparece no final de cada página)
+  t = t.replace(/\s*ZapSign\s*-\s*[a-f0-9-]{36}[^\n]*/gi, '');
 
   // 3. Remove campos de metadados de autenticação
   t = t.replace(/^Hash do documento original[\s\S]*?\n/gim, '');

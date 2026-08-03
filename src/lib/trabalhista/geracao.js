@@ -80,8 +80,8 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
     temMaterial
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 4, texto: textoParaExtracao || '', fileUrls: urlsVisao }), () => extrairCasoDeTexto(textoParaExtracao || '', urlsVisao), {
-          onHit: () => notify('Reutilizando análise estruturada da entrevista em cache...'),
+      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 5, texto: textoParaExtracao || '', fileUrls: urlsVisao }), () => extrairCasoDeTexto(textoParaExtracao || '', urlsVisao), {
+          onHit: () => notify('Reutilizando análise estruturada da entrevista em cache (v5)...'),
         }).catch(() => ({ caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Falha na extração estruturada.' }] }))
       : Promise.resolve({ caso: {}, alertas: [] }),
   ]);
@@ -104,8 +104,13 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
       preenchidosDet += 1;
     }
   }
-  if (preenchidosDet > 0 && Object.keys(caso).length <= 2) {
-    notify(`IA não extraiu dados estruturados — preenchido por extração determinística (${preenchidosDet} campos).`);
+  const camposIA = Object.keys(caso).length;
+  const camposDeterministicos = Object.keys(casoDet).length;
+  if (preenchidosDet > 0) notify(`Fallback determinístico (regex) preencheu ${preenchidosDet} campos adicionais.`);
+  if (camposIA === 0 && camposDeterministicos === 0) {
+    notify('⚠ Nenhum dado extraído do documento. Verifique se o PDF contém texto selecionável ou tente novamente — o documento pode ter sido processado como imagem pela IA de visão.');
+  } else {
+    notify(`Extração concluída: ${camposIA} campos via IA de visão, ${preenchidosDet} campos via fallback regex.`);
   }
   // Corrige série: se a IA confundiu série com o número da CTPS (mesmo valor),
   // usa a série extraída por regex — evita [SÉRIE] na minuta final.
@@ -259,7 +264,15 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
-  if (!caso.salario) notify('⚠ Salário não encontrado na entrevista — cálculos rescisórios ficarão zerados. Informe o salário para gerar os valores.');
+  // Aviso de campos críticos ausentes após toda a extração
+  const camposCriticos = [];
+  if (!caso.salario) camposCriticos.push('salário (cálculos rescisórios ficarão zerados)');
+  if (!caso.recl_nome) camposCriticos.push('nome do reclamante');
+  if (!caso.data_admissao) camposCriticos.push('data de admissão');
+  if (!caso.data_rescisao) camposCriticos.push('data de rescisão');
+  if (camposCriticos.length) {
+    notify(`⚠ Campos críticos não encontrados: ${camposCriticos.join(', ')}. Se o documento é um PDF de imagem, tente enviar novamente — a IA de visão pode precisar de mais tempo. Você também pode informar esses dados diretamente no chat.`);
+  }
   if (caso.data_admissao && caso.data_rescisao) {
     notify(`Contrato: ${caso.data_admissao} a ${caso.data_rescisao} (${Math.round((new Date(caso.data_rescisao) - new Date(caso.data_admissao)) / 86400000 / 30.44)} meses) — função: ${caso.funcao || 'não informada'}.`);
   }
