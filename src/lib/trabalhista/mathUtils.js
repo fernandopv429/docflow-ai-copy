@@ -194,27 +194,56 @@ export function calcularVerbasCaso(caso = {}) {
   const meses = mesesContrato(caso.data_admissao, caso.data_rescisao);
   const anos = meses == null ? null : Math.floor(meses / 12);
   const folgasMes = Number(caso.ft_qtd_media) || null;
+  // Rescisão por acordo (art. 484-A CLT): aviso prévio pela metade e multa do
+  // FGTS de 20%. O 13º e as férias proporcionais permanecem INTEGRAIS.
+  const isAcordo = caso.tipo_dispensa === 'acordo';
 
   if (meses != null) {
     itens.push({ item: 'Duração do contrato', memoria: `${meses} mês(es) / ${anos} ano(s) completo(s)`, valor: null });
   }
 
+  // Saldo de salário do mês da rescisão (verba rescisória incontroversa).
+  const saldo = saldoSalario(salario, caso.data_rescisao);
+  if (saldo) itens.push({ item: 'Saldo de salário', memoria: `${saldo.dias} dia(s) do mês da rescisão (base 30)`, valor: saldo.valor });
+
   // Verbas rescisórias — 13º e férias usam a data PROJETADA pelo aviso prévio
-  const ap = avisoPrevio(salario, anos);
-  if (ap) itens.push({ item: 'Aviso prévio indenizado', memoria: `${ap.dias} dias (Lei 12.506/2011)`, valor: ap.valor });
+  const ap = avisoPrevio(salario, anos, { acordo: isAcordo });
+  if (ap) {
+    const memoriaAp = isAcordo
+      ? `${ap.dias} dias — metade de ${ap.diasIntegral} (art. 484-A, I, CLT — acordo)`
+      : `${ap.dias} dias (Lei 12.506/2011)`;
+    itens.push({ item: 'Aviso prévio indenizado', memoria: memoriaAp, valor: ap.valor });
+  }
   const rescisaoProjetada = dataRescisaoProjetada(caso.data_admissao, caso.data_rescisao, anos);
   const dataFim = rescisaoProjetada || caso.data_rescisao;
+  // Meses COM a projeção do aviso — usados no FGTS (Súm. 305/371 TST: o aviso
+  // prévio indenizado integra o tempo de serviço, inclusive para FGTS).
+  const mesesProjetados = mesesContrato(caso.data_admissao, dataFim) ?? meses;
   // 13º: mês conta só se ≥15 dias. A projeção do aviso só amplia a data final;
   // o último mês projetado NÃO é forçado (6 dias em jan. NÃO viram 1/12).
   const avos13 = salario ? avosEntreDatas(caso.data_admissao, dataFim, false) : null;
-  if (avos13 != null) itens.push({ item: '13º proporcional', memoria: `${avos13}/12 avos (proj. aviso prévio)`, valor: round2((salario / 12) * avos13) });
+  const valor13 = avos13 != null ? round2((salario / 12) * avos13) : null;
+  if (valor13 != null) itens.push({ item: '13º proporcional', memoria: `${avos13}/12 avos (proj. aviso prévio)`, valor: valor13 });
   // Férias: período aquisitivo — só conta mês com ≥15 dias (projeção não força o último mês)
   const avosFerias = salario ? avosEntreDatas(caso.data_admissao, dataFim, false) : null;
-  if (avosFerias != null) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${avosFerias}/12 avos + 1/3 (proj. aviso prévio)`, valor: round2((salario / 12) * avosFerias * (4 / 3)) });
-  const fg = fgtsPeriodo(salario, meses);
+  const valorFerias = avosFerias != null ? round2((salario / 12) * avosFerias * (4 / 3)) : null;
+  if (valorFerias != null) itens.push({ item: 'Férias proporcionais + 1/3', memoria: `${avosFerias}/12 avos + 1/3 (proj. aviso prévio)`, valor: valorFerias });
+
+  // Multa do art. 467 da CLT: 50% sobre as verbas rescisórias INCONTROVERSAS
+  // (saldo + aviso prévio + 13º + férias +1/3), não apenas "1 salário".
+  if (ap && valor13 != null && valorFerias != null) {
+    const baseIncontroversa = round2((saldo?.valor || 0) + ap.valor + valor13 + valorFerias);
+    itens.push({ item: 'Multa do art. 467 da CLT', memoria: '50% sobre saldo + aviso prévio + 13º + férias +1/3 (verbas incontroversas)', valor: round2(baseIncontroversa * 0.5) });
+  }
+
+  const fg = fgtsPeriodo(salario, mesesProjetados, { multaPct: isAcordo ? 0.2 : 0.4 });
   if (fg) {
-    itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${meses} meses`, valor: fg.deposito });
-    itens.push({ item: 'Multa de 40% do FGTS', memoria: '40% sobre os depósitos', valor: fg.multa40 });
+    itens.push({ item: 'FGTS do período (8%)', memoria: `8% × ${mesesProjetados} meses (proj. aviso prévio)`, valor: fg.deposito });
+    itens.push({
+      item: isAcordo ? 'Multa de 20% do FGTS (acordo)' : 'Multa de 40% do FGTS',
+      memoria: isAcordo ? '20% sobre os depósitos (art. 484-A, II, CLT — acordo)' : '40% sobre os depósitos',
+      valor: fg.multa,
+    });
   }
 
   // Dano moral (10x a maior remuneração na função)
