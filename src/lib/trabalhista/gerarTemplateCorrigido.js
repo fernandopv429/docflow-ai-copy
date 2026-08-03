@@ -61,7 +61,14 @@ function _substituirFraseTagTolerant(xml, frase, destino) {
 }
 
 function _envolver(xml, posAntes_ini, posDepois_fim, bloco, pPr) {
-  const antes = _paraTx(`{{#${bloco}}}{{${bloco}}}{{/${bloco}}}`, pPr) + _paraTx(`{{^${bloco}}}`);
+  // Cada tag em parágrafo SEPARADO — com paragraphLoop:true do docxtemplater,
+  // {{#BLOCO}}/{{BLOCO}}/{{/BLOCO}} no mesmo <w:t> não reconhece a seção
+  // condicional e trata {{BLOCO}} como tag solta (dispara o nullGetter).
+  const antes =
+    _paraTx(`{{#${bloco}}}`, pPr) +
+    _paraTx(`{{${bloco}}}`, pPr) +
+    _paraTx(`{{/${bloco}}}`, pPr) +
+    _paraTx(`{{^${bloco}}}`);
   const fim = _paraTx(`{{/${bloco}}}`);
   let novo = xml.slice(0, posDepois_fim) + fim + xml.slice(posDepois_fim); // fim primeiro (posição maior)
   novo = novo.slice(0, posAntes_ini) + antes + novo.slice(posAntes_ini);

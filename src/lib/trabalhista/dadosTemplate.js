@@ -245,7 +245,8 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
 
   // 4) Reclamante
   dados.RECL_NOME = (caso.recl_nome || '[NOME DO RECLAMANTE]').toUpperCase();
-  dados.RECL_NACIONALIDADE = caso.recl_nacionalidade || 'brasileiro(a)';
+  const _genNac = (caso.recl_genero || 'M').toUpperCase() === 'F' ? 'F' : 'M';
+  dados.RECL_NACIONALIDADE = caso.recl_nacionalidade || (_genNac === 'F' ? 'brasileira' : 'brasileiro');
   dados.RECL_ESTADO_CIVIL = caso.recl_estado_civil || '[ESTADO CIVIL]';
   dados.RECL_FUNCAO = caso.funcao || attrs.funcao || '[FUNÇÃO]';
   dados.RECL_RG = caso.recl_rg || '[RG]';
@@ -304,10 +305,10 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   // 10) CCT
   dados.CCT_ANO = caso.cct_ano || '';
   dados.CCT_CLAUSULAS = caso.cct_clausulas || '';
-  // Cláusula da multa convencional: se não extraída (nem obtida da CCT), deixa
-  // undefined para o nullGetter exibir [A PREENCHER: CCT_CLAUSULA_MULTA] —
-  // nunca renderizar o número em branco no meio da frase.
-  dados.CCT_CLAUSULA_MULTA = caso.cct_clausula_multa || undefined;
+  // Cláusula da multa convencional: se não extraída, string vazia — o bloco
+  // BLOCO_MULTAS_CONVENCIONAIS (fallback ou IA) já trata a ausência do número
+  // no texto, evitando [A PREENCHER: CCT_CLAUSULA_MULTA] no documento final.
+  dados.CCT_CLAUSULA_MULTA = caso.cct_clausula_multa || '';
 
   // 11) Verbas rescisórias — períodos
   dados.PERIODO_FERIAS_PROP = caso.periodo_ferias_prop || '';
