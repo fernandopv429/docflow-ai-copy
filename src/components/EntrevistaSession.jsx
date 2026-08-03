@@ -10,12 +10,11 @@ import DocumentReviewPreview from '@/components/DocumentReviewPreview';
 import { exportarDocxTemplate } from '@/lib/preencherDocxTemplate';
 import { TIPO_DISPENSA_LABELS } from '@/lib/trabalhista/tokens';
 import { formatBRL } from '@/lib/trabalhista/mathUtils';
-import { fontesAuditoria, fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
+import { fontesEntrevista, fontesGeracao } from '@/lib/trabalhista/fontesAnalise';
 import useConsoleLogs from '@/hooks/useConsoleLogs';
 import {
   conversarEntrevista,
   gerarDadosPeca,
-  verificarCoerencia,
 } from '@/lib/trabalhista/modelosReferencia';
 import {
   carregarEsqueletoTemplate,
@@ -168,32 +167,6 @@ export default function EntrevistaSession({ sessionId, active = true }) {
       }
       setMessages((m) => [...m, { role: 'assistant', text: nota }]);
 
-      // Verificação de coerência jurídica (LLM audita, não reescreve)
-      setMessages((m) => [...m, { role: 'tool', text: 'Verificando coerência jurídica da peça...' }]);
-      try {
-        const verif = await verificarCoerencia({ texto: geracaoTexto, caso, dados, documentoTexto });
-        const alertas = verif?.alertas || [];
-        const icone = { BLOQUEANTE: '⛔', ATENCAO: '⚠️', INFO: 'ℹ️' };
-        const cabecalho = `Verificação de coerência — status: ${verif?.status || 'concluída'}.`;
-        const corpo = alertas.length
-          ? '\n' + alertas.map((a) => `${icone[a.severidade] || '•'} ${a.descricao}${a.sugestao ? ` — ${a.sugestao}` : ''}`).join('\n')
-          : ' Nenhum problema aparente. A revisão humana do advogado continua obrigatória.';
-        setMessages((m) => [
-          ...m,
-          { role: 'tool_result', title: 'Retorno da auditoria de coerência (IA)', text: JSON.stringify(verif, null, 2) },
-          {
-            role: 'tool_result',
-            title: 'Fontes consultadas nesta auditoria',
-            text: JSON.stringify(fontesAuditoria({
-              texto: geracaoTexto,
-              referencia: modeloSemelhante,
-            }), null, 2),
-          },
-          { role: 'assistant', text: cabecalho + corpo },
-        ]);
-      } catch (e) {
-        console.error(e);
-      }
     } catch (err) {
       console.error(err);
       setMessages((m) => [...m, { role: 'assistant', text: 'Erro ao gerar a peça. Tente novamente.' }]);
