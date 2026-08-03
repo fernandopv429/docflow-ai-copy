@@ -281,7 +281,10 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
   dados.MOTIVO_SAIDA_RESUMIDO = MOTIVO_SAIDA[tipo] || 'foi dispensado sem justa causa';
 
   // 7) Textos livres do caso concreto (parser)
-  dados.DANO_MORAL_FATO_ESPECIFICO = caso.tem_dano_moral ? narrativaDanoMoral(caso) : '[DESCREVER O FATO CONCRETO DO DANO MORAL]';
+  // A seção DO DANO MORAL é sempre presente no template (sem condicional),
+  // então a narrativa deve sempre ter conteúdo — nunca o placeholder em
+  // colchetes (que entra em loop circular com o mapeamento de brackets).
+  dados.DANO_MORAL_FATO_ESPECIFICO = narrativaDanoMoral(caso);
 
   // 8) Jornada
   dados.JORNADA_HORARIOS = caso.jornada_horario || '[HORÁRIOS]';
