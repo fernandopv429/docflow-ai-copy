@@ -4,15 +4,23 @@
 // parser determinístico (regex) — a IA NÃO precisa reler o PDF por
 // visão quando o texto é extraível (formulário digitado).
 // ============================================================
-import * as pdfjsLib from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+// pdfjs-dist é carregado sob demanda (import dinâmico) para não afetar o
+// carregamento da página e isolar falhas do worker do fluxo principal.
+let pdfjsPronto = null;
+async function carregarPdfjs() {
+  if (pdfjsPronto) return pdfjsPronto;
+  const pdfjsLib = await import('pdfjs-dist');
+  const { default: workerUrl } = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+  pdfjsPronto = pdfjsLib;
+  return pdfjsPronto;
+}
 
 const ehPdf = (u) => /\.pdf(\?[^/]*)?$/i.test(String(u));
 
 // Extrai texto de um PDF. Retorna { texto, temTexto }.
 async function extrairDeUmPdf(url) {
+  const pdfjsLib = await carregarPdfjs();
   const resp = await fetch(url);
   if (!resp.ok) return { texto: '', temTexto: false };
   const arrayBuffer = await resp.arrayBuffer();
