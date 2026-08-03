@@ -147,6 +147,18 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     }
   }
 
+  // 9) JORNADA (narrativa fática): envolve APENAS os parágrafos da seção "DA
+  // JORNADA DE TRABALHO" (do "Para elucidação dos direitos…" até "Cumpre
+  // ressaltar…", antes do título "DAS HORAS EXTRAS"). A descaracterização da
+  // escala (com ementas reais), art. 71, adicional noturno, 10 minutos,
+  // periculosidade e DSR permanecem DETERMINÍSTICOS — não são tocados.
+  if (!xml.includes('BLOCO_JORNADA')) {
+    const ps = _paras(xml);
+    const ini = ps.findIndex((p) => _textoPara(p.raw).includes('Para elucidação dos direitos aqui pleiteados'));
+    const fim = ini < 0 ? -1 : ps.findIndex((p, i) => i >= ini && _textoPara(p.raw).includes('Cumpre ressaltar que o obreiro pode ter feito outras escalas'));
+    if (ini >= 0 && fim >= 0) xml = _envolver(xml, ps[ini].start, ps[fim].end, 'BLOCO_JORNADA', _pPr(ps[ini].raw));
+  }
+
   zip.file('word/document.xml', xml);
   const blob = zip.generate({
     type: 'blob',
