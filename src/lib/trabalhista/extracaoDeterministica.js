@@ -39,7 +39,9 @@ const ESTADOS_CIVIS = /^(solteir[oa]|casad[oa]?|divorciad[oa]|separad[oa]|vi[úu
 // Rótulos de entrevista separados por espaços (não newlines). Sem isto, regexes
 // que capturam [^\n]+ engolem rótulos subsequentes (ex.: "Jornada: 5x2 ... HORAS
 // EXTRAS: ... GRATIFICAÇÃO: ..."), vazando texto bruto da entrevista no template.
-const ROTULOS = /\s+(?:Admiss|Jornada|Sal[áa]|Remunera|DANO|GRATIFICA|AC[ÚU]MULO|HORAS|RESUMO|TEMPO|Sem\s+JUSTA|RESOLU|ENDERE|CEP|CNPJ|DATA|INTERVALO|INTRA|PERICUL|INSALUB|RITO|COMARCA|RECLAMAD|FOLGAS|VALE|AUX[ÍI]LIO|PIS|CTPS|RG\b|CPF|NASC|FILIA|RESID|DOMICIL|ESCALA|INTRAJORNADA|FUN[ÇC][ÃA]O|DIREITOS|ESTADO\s+CIVIL|NACIONALIDADE|TIPO|RESOLU|S[ée]rie)/i;
+// Rótulos precedidos por 2+ espaços ou newline — evita falsos matches em
+// palavras dentro do valor (ex.: "vale-transporte" cortado como rótulo "VALE").
+const ROTULOS = /(?:\s{2,}|\n)(?:Admiss|Jornada|Sal[áa]|Remunera|DANO|GRATIFICA|AC[ÚU]MULO|HORAS|RESUMO|TEMPO|Sem\s+JUSTA|RESOLU|ENDERE|CNPJ|DATA|INTERVALO|INTRA|PERICUL|INSALUB|RITO|COMARCA|RECLAMAD|FOLGAS|VALE|AUX[ÍI]LIO|PIS|CTPS|RG\b|CPF|NASC|FILIA|RESID|DOMICIL|ESCALA|INTRAJORNADA|FUN[ÇC][ÃA]O|DIREITOS|ESTADO\s+CIVIL|NACIONALIDADE|TIPO|RESOLU|S[ée]rie)/i;
 function cortarAteRotulo(texto) {
   return String(texto || '').split(ROTULOS)[0].replace(/[.,;\s]+$/, '').trim();
 }
@@ -89,8 +91,12 @@ export function extrairDeterministico(texto) {
   const fil = matchAny(t, /filh[oa]\s+de\s+(.+?)(?:,\s*residente|,\s*com\s*correio|,\s*domiciliad)/i);
   if (fil) caso.recl_filiacao = fil.trim();
 
-  // Endereço do reclamante — entre "residente e domiciliado na" e "CEP"
-  const end = matchAny(t, /(?:residente|domiciliad[oa])\s+(?:e\s*domiciliad[oa]\s+)?n[ao]\s*(.+?)(?:CEP|,\s*com\s*correio)/i);
+  // Endereço do reclamante — entre "residente e domiciliado na" e ", com correio"
+  // (inclui o CEP no endereço). Fallback: até "CEP" se não houver "com correio".
+  const end = matchAny(t, [
+    /(?:residente|domiciliad[oa])\s+(?:e\s*domiciliad[oa]\s+)?n[ao]\s*(.+?)(?:,\s*com\s*correio)/i,
+    /(?:residente|domiciliad[oa])\s+(?:e\s*domiciliad[oa]\s+)?n[ao]\s*(.+?)(?:\s+CEP|\n|$)/i,
+  ]);
   if (end) caso.recl_endereco = end.replace(/[,\s]+$/, '').trim();
 
   // Função — texto após "FUNÇÃO:" até o próximo rótulo (Admissão:, Jornada:,
@@ -123,7 +129,7 @@ export function extrairDeterministico(texto) {
   // Endereços das reclamadas (após "ENDEREÇO:") — 1ª e 2ª ocorrência.
   // Essencial p/ a competência: sem o endereço da tomadora (recl2), o template
   // vazava a residência do reclamante como local de prestação.
-  const endsLog = [...t.matchAll(/ENDERE[ÇC]O[:\s]*([^\n]+)/gi)].map((m) => m[1].trim());
+  const endsLog = [...t.matchAll(/ENDERE[ÇC]O[:\s]*([^\n]+)/gi)].map((m) => cortarAteRotulo(m[1]).trim());
   if (endsLog[0]) caso.recl1_logradouro = endsLog[0];
   if (endsLog[1]) caso.recl2_logradouro = endsLog[1];
 
@@ -233,10 +239,15 @@ export function extrairDeterministico(texto) {
   else if (/rescis[ãa]o\s*indireta/i.test(t)) caso.tipo_dispensa = 'rescisao_indireta';
   else if (/pedido\s*de\s*demiss[ãa]o/i.test(t)) caso.tipo_dispensa = 'nulidade_pedido_demissao';
 
-  // Dano moral
+  // Dano moral — trata o rótulo combinado "DANO MORAL / DIREITOS LESADOS:"
+  // (comum em roteiros do escritório) capturando só o texto após os dois pontos,
+  // sem o prefixo "/ DIREITOS LESADOS:" que vazava para o template.
   if (/dano\s*moral/i.test(t)) {
     caso.tem_dano_moral = true;
-    const dano = matchAny(t, /DANO\s*MORAL[:\s]*\n?(.+?)(?:\n\n|$)/i);
+    const dano = matchAny(t, [
+      /DANO\s*MORAL\s*\/\s*DIREITOS\s+LESADOS[:\s]*([^\n]+)/i,
+      /DANO\s*MORAL[:\s]*\n?(.+?)(?:\n\n|$)/i,
+    ]);
     if (dano) caso.dano_fatos = dano.trim();
   }
 
@@ -256,7 +267,14 @@ export function extrairDeterministico(texto) {
     caso.tem_insalubridade = true;
     const insMatch = /(?:INSALUBRIDADE|AMBIENTE\s+INSALUBRE)[:\s]*([^\n]+)/i.exec(t);
     if (insMatch) caso.insalubridade_descricao = cortarAteRotulo(insMatch[1]);
-    else if (/odor|EPI/i.test(t)) caso.insalubridade_descricao = 'Ambiente de trabalho insalubre com odor e sem EPIs adequados.';
+    else if (/ambiente\s+de\s+trabalho\s+insalubre/i.test(t)) {
+      // Extrai o texto específico após "ambiente de trabalho insalubre" —
+      // capta odor, EPIs inadequados etc. (comum na seção de dano moral).
+      const ctx = /ambiente\s+de\s+trabalho\s+insalubre\s+(.+?)(?:\.\s*$|$)/i.exec(t);
+      caso.insalubridade_descricao = ctx
+        ? `Ambiente de trabalho insalubre ${ctx[1].trim().replace(/\.$/, '')}`
+        : 'Ambiente de trabalho insalubre com odor e sem EPIs adequados.';
+    } else if (/odor|EPI/i.test(t)) caso.insalubridade_descricao = 'Ambiente de trabalho insalubre com odor e sem EPIs adequados.';
   }
 
   // Vigilante -> periculosidade

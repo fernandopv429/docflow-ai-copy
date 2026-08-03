@@ -280,6 +280,8 @@ export async function extrairCasoDeTexto(texto, fileUrls) {
   const request = {
     prompt: `Você é uma especialista sênior em direito trabalhista que analisa entrevistas de empregados para montar petições. Leia TODO o material abaixo e extraia todos os campos com máxima inteligência inferencial — como uma advogada experiente faria.
 
+ATENÇÃO AO FORMATO: A entrevista pode ter rótulos separados por MÚLTIPLOS ESPAÇOS (não quebras de linha). Ex.: "FUNÇÃO: AUXILIAR DE CORTADOR   Admissão: 10/05/2023   Sem JUSTA CAUSA: 22/06/2026   Jornada: 5x2 - 07:00 às 17:00". Cada rótulo (FUNÇÃO:, Admissão:, Jornada:, HORAS EXTRAS:, GRATIFICAÇÃO:, ACÚMULO/DESVIO DE FUNÇÃO:, DANO MORAL / DIREITOS LESADOS:, etc.) inicia um campo DISTINTO — separe-os corretamente e NÃO inclua texto de um rótulo no valor de outro. O texto entre um rótulo e o próximo é o valor daquele campo.
+
 ${blocoTexto}${blocoArquivos}
 
 === REGRAS DE EXTRAÇÃO CRÍTICAS (HARD RULES — sob pena de falha) ===
