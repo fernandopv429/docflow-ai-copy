@@ -60,7 +60,7 @@ export const ESPECIALISTAS = [
       return extras.length ? `${base}\nTÓPICOS ADICIONAIS (conforme os dados do caso): ${extras.join(' ')}` : base;
     },
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em jornada de trabalho. Redija o bloco de jornada seguindo o micropadrão: fato → artigo da CLT + Súmula do TST + cláusula da CCT → impugnação (Súmula 338) → pedido com reflexos.',
+      'Você é advogado(a) trabalhista especialista em jornada de trabalho. Redija o bloco de jornada em prosa jurídica fluida e natural, organizado nos quatro blocos legais (fatos, fundamento legal, jurisprudência, pedido), evitando o padrão enlatado repetitivo.',
   },
   {
     numero: 'dano_moral',
@@ -167,7 +167,9 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
     '- NÃO faça aritmética. Use exatamente os valores de VALORES CALCULADOS.',
     '- Cite SOMENTE as cláusulas listadas em CLÁUSULAS DA CCT. Nunca invente número de cláusula.',
     '- Escreva APENAS os capítulos solicitados abaixo. NÃO escreva endereçamento, qualificação das partes, valor da causa, honorários, data ou fecho — o sistema gera isso.',
-    '- Padrão de redação de cada capítulo: fato → fundamento legal (CLT) + Súmula do TST + cláusula da CCT → impugnação (Súmula 338, quando couber) → pedido com reflexos (DSR, aviso, férias+1/3, 13º, FGTS+40%).',
+    '- ESTRUTURA FIXA — quatro blocos legais por capítulo, nesta ordem: (1) FATOS — narre o que ocorreu no caso concreto em prosa articulada (sem bullets mecânicos); (2) FUNDAMENTO LEGAL/NORMATIVO — cite dispositivos da CLT, Súmulas do TST e cláusulas da CCT integrados ao texto (não como lista solta); (3) JURISPRUDÊNCIA — trate, quando relevante, a interpretação que ampara a tese; (4) PEDIDO/CONCLUSÃO — formule o requerimento com os reflexos (DSR, aviso prévio, férias+1/3, 13º, FGTS+40%).',
+    '- REDAÇÃO NATURAL: escreva em parágrafos jurídicos coesos e fluídos, como um advogado experiente em uma petição — NÃO use o padrão rígido "fato → artigo → Súmula → impugnação → pedido" repetido mecanicamente em cada capítulo. Varie a construção das frases, encadeie os argumentos e evite listas/colchetes e linguagem robótica; o texto deve soar natural, não enlatado.',
+    '- Mantenha a impugnação da defesa (Súmula 338) e os reflexos quando cabíveis, mas inseridos organicamente no bloco de pedido, não como etapa idêntica obrigatória em todos os capítulos.',
     '- Cada capítulo NÃO deve invadir o tópico de outro. Respeite o escopo indicado em cada um.',
     '',
     'DADOS DO CASO:',
