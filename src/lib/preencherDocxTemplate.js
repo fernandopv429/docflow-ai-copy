@@ -141,7 +141,13 @@ export function preencherDocxTemplate(arrayBuffer, dados) {
     delimiters: { start: '{{', end: '}}' }, // mantém suporte a {{campo}} e {{#flag}}...{{/flag}}
     paragraphLoop: true,
     linebreaks: true,
-    nullGetter: () => '',
+    // NUNCA deixar placeholder vazio: tags {{CAMPO}} sem valor viram um
+    // marcador visível [A PREENCHER: TAG] para o advogado localizar e preencher
+    // (ex.: capítulo da IA que não veio, campo não extraído da entrevista).
+    nullGetter: (part) => {
+      const tag = (part && typeof part === 'object' && part.value) ? part.value : (typeof part === 'string' ? part : '');
+      return tag ? `[A PREENCHER: ${tag}]` : '[A PREENCHER]';
+    },
   });
   doc.render(dados || {});
   const outZip = doc.getZip();
