@@ -343,5 +343,16 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
       `Portanto, requer a condenação da reclamada ao pagamento da multa convencional de 50% (cinquenta por cento) do piso salarial da categoria por mês laborado, durante todo o período contratual, com reflexos em DSR, aviso prévio, férias acrescidas de 1/3, 13º salários e FGTS + 40%.`;
   }
 
+  // Fallback da seção "DAS MULTAS CONVENCIONAIS": abertura coerente quando a
+  // IA não redigir (ou está desativada). Substitui a frase fixa do template
+  // (que dependia de {{CCT_CLAUSULA_MULTA}} em branco) por um parágrafo
+  // completo; a IA sobrescreve quando ativa (redacaoTeses).
+  {
+    const anoCct = caso.cct_ano || '';
+    const clMulta = caso.cct_clausula_multa ? ` (cláusula ${caso.cct_clausula_multa})` : '';
+    dados.BLOCO_MULTAS_CONVENCIONAIS =
+      `O reclamante requer a aplicação da multa convencional prevista na Convenção Coletiva de Trabalho da categoria${anoCct ? ` – ${anoCct} e as anteriores` : ''}${clMulta}, por descumprimento, pela reclamada, das obrigações convencionais a seguir elencadas, nos termos da cláusula de penalidade da referida convenção:`;
+  }
+
   return dados;
 }

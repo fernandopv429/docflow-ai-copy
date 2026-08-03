@@ -83,9 +83,9 @@ export const ESPECIALISTAS = [
     campo: 'BLOCO_DANO_MORAL',
     ativo: (d, c) => !!c.tem_dano_moral,
     instrucao:
-      'Escreva APENAS o capítulo de dano moral, INCORPORANDO a narrativa concreta dos abusos relatados (campos dano_fatos/dano_supervisor) à fundamentação doutrinária padrão. NÃO trate de jornada, rescisão nem verbas.',
+      'Escreva APENAS a narrativa CONCRETA dos fatos do dano moral — 2 a 4 frases articuladas em prosa jurídica fluida e COERENTE, sem fragmentos soltos nem frases isoladas, incorporando os abusos relatados (campos dano_fatos/dano_supervisor: nome do supervisor, perseguição, humilhação, desconto indevido de consignado, etc.). NÃO escreva a fundamentação constitucional/doutrinária (art. 5º, V/X, CF; art. 186, CC) — ela já consta do template antes deste bloco. NÃO trate de jornada, rescisão nem verbas. NÃO cite valores em R$.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em dano moral trabalhista. Redija o capítulo com a fundamentação doutrinária padrão e a narrativa concreta do caso. O valor (10x a maior remuneração) é calculado por código e consta APENAS do rol de pedidos — NÃO cite o valor em R$ no capítulo.',
+      'Você é advogado(a) trabalhista especialista em dano moral. Redija APENAS a narrativa concreta dos fatos (os abusos específicos sofridos pelo reclamante), em prosa articulada e coerente — sem a fundamentação doutrinária (já presente no template) e sem valores em R$ (calculados por código).',
   },
   {
     numero: 'enquadramento',
@@ -106,6 +106,19 @@ export const ESPECIALISTAS = [
       'Escreva APENAS o capítulo de responsabilidade subsidiária da 2ª reclamada (tomadora), com fundamento na Súmula 331 do TST. NÃO trate de outros tópicos.',
     promptPadrao:
       'Você é advogado(a) trabalhista especialista em terceirização e responsabilidade subsidiária (Súmula 331 do TST). Redija o capítulo pedindo a condenação subsidiária da tomadora pelos créditos deferidos.',
+  },
+  {
+    numero: 'multas_convencionais',
+    nome: 'Multas convencionais',
+    campo: 'BLOCO_MULTAS_CONVENCIONAIS',
+    ativo: (d, c) => !!(c.cct_ano || c.sindicato || d.periculosidade || d.assiduidade || d.folgas_trabalhadas || d.desvio_funcao || d.acumulo_funcao || d.dez_minutos_cct),
+    instrucao: (d, c) =>
+      'Escreva APENAS o parágrafo de ABERTURA da seção "DAS MULTAS CONVENCIONAIS" — um parágrafo RICO e COERENTE em prosa jurídica fluida (NÃO uma frase solta nem mera troca de palavra), requerendo a aplicação da multa convencional prevista na Convenção Coletiva de Trabalho da categoria' +
+      (c.cct_ano ? ` (vigência ${c.cct_ano} e anteriores)` : '') +
+      (c.cct_clausula_multa ? `, nos termos da cláusula ${c.cct_clausula_multa} da referida convenção` : ', nos termos da cláusula de penalidade da referida convenção') +
+      ', por descumprimento, pela reclamada, das obrigações convencionais a seguir elencadas. Encerre o parágrafo com transição que introduza a lista de infrações (ex.: "...a seguir elencadas:"). NÃO escreva a lista de infrações (ela já está no template). NÃO cite valores em R$.',
+    promptPadrao:
+      'Você é advogado(a) trabalhista especialista em direito coletivo e multas convencionais. Redija o parágrafo de abertura da seção de multas convencionais em prosa jurídica rica e coerente, sem valores em R$ e sem reproduzir a lista de infrações.',
   },
 ];
 

@@ -75,6 +75,17 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     xml = xml.replace(NARRATIVA_DESVIO, '{{BLOCO_ENQUADRAMENTO}}');
   }
 
+  // 5) Multas convencionais: substitui a frase fixa de abertura (que deixava
+  // o número da cláusula {{CCT_CLAUSULA_MULTA}} em branco quando não extraído)
+  // por {{BLOCO_MULTAS_CONVENCIONAIS}} — bloco redigido pela IA (parágrafo
+  // rico e coerente) ou pelo fallback determinístico de dadosTemplate. A
+  // frase inteira está em uma única <w:t>, então a substituição é literal e
+  // segura. A lista de infrações que se segue no template é preservada.
+  const FRASE_MULTAS = 'O reclamante requer a aplica\u00e7\u00e3o da multa da cl\u00e1usula {{CCT_CLAUSULA_MULTA}} da CCT \u2013 {{CCT_ANO}} e as anteriores, eis que a reclamada n\u00e3o cumpriu com as obriga\u00e7\u00f5es convencionais, onde passamos a discorrer as infra\u00e7\u00f5es infra:';
+  if (!xml.includes('BLOCO_MULTAS_CONVENCIONAIS') && xml.includes(FRASE_MULTAS)) {
+    xml = xml.replace(FRASE_MULTAS, '{{BLOCO_MULTAS_CONVENCIONAIS}}');
+  }
+
   zip.file('word/document.xml', xml);
   const blob = zip.generate({
     type: 'blob',
