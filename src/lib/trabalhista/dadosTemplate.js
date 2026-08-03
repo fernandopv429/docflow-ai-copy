@@ -154,7 +154,7 @@ function hojeExtenso() {
 // redação está desligada, constrói um parágrafo articulado a partir dos fatos
 // do caso (desvio sem contraprestação, folgas via PIX/dinheiro, etc.). A IA,
 // quando ativa, sobrescreve via BLOCO_DANO_MORAL (geracao.js).
-function narrativaDanoMoral(caso) {
+export function narrativaDanoMoral(caso) {
   const raw = (caso.dano_fatos || caso.dano_supervisor || '').trim();
   if (raw.length >= 80) return raw; // narrativa real do parser — usa como está
   const fatos = [];

@@ -31,6 +31,7 @@ import {
   enriquecerCct,
   extrairPisoCct,
 } from './consultas';
+import { narrativaDanoMoral } from './dadosTemplate';
 
 // ============================================================
 // Anonimização (mesma lógica usada no cadastro dos modelos)
@@ -679,7 +680,8 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   ]);
   // Merge determinístico (regex) sobre o caso da IA — garante e-mail pessoal
   // e gênero do reclamante mesmo quando o parser da IA não os extraiu.
-  const caso = { ...casoRaw };
+  // extrairCasoDeTexto retorna { caso, alertas } — desembrulhar antes de mergear.
+  const caso = { ...(casoRaw?.caso || {}) };
   const casoDet = texto && texto.trim() ? extrairDeterministico(texto) : {};
   for (const k of Object.keys(casoDet || {})) {
     const v = casoDet[k];
@@ -801,6 +803,16 @@ export async function gerarPecaPadrao({ texto, fileUrls, attrs, modeloPadrao, on
   // Digital se a IA o omitiu (e-mail vem da extração determinística).
   if (caso.recl_email) {
     htmlLimpo = injetarEmailPessoal(htmlLimpo, caso.recl_email);
+  }
+  // Dano moral: se a IA deixou o placeholder [DESCREVER O FATO CONCRETO DO DANO
+  // MORAL] sem preencher, injeta a narrativa determinística construída a partir
+  // dos fatos do caso (desvio, folgas via PIX, integração por fora, etc.).
+  if (/\[DESCREVER O FATO CONCRETO DO DANO MORAL\]/i.test(htmlLimpo)) {
+    const narrativa = narrativaDanoMoral(caso);
+    if (narrativa) {
+      htmlLimpo = htmlLimpo.replace(/\[DESCREVER O FATO CONCRETO DO DANO MORAL\]/gi, narrativa);
+      notify('Narrativa do dano moral injetada deterministicamente (a IA deixou o placeholder vazio).');
+    }
   }
 
   // Valor da causa: somado por código a partir do array PEDIDOS_VALORES que a
