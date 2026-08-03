@@ -191,7 +191,8 @@ export default function ModelosReferencia() {
               <Library className="w-5 h-5 text-[#1a73e8]" /> Modelos de Referência
             </h1>
             <p className="text-xs text-[#5f6368]">
-              Peças corretas usadas como base para gerar novas minutas a partir da entrevista.
+              Peças corretas usadas como base para gerar novas minutas. A IA usa o <strong>diferencial</strong> de cada modelo
+              para adaptar teses e capítulos ao tipo de caso — quanto mais preciso o diferencial, mais aderente a minuta.
             </p>
           </div>
           <div>
@@ -208,14 +209,19 @@ export default function ModelosReferencia() {
 
         <div className="bg-[#e8f0fe] border border-[#c6dafc] rounded-xl p-4 text-xs text-[#3c4043]">
           Você pode enviar <strong>vários .docx de uma vez</strong>. O texto é <strong>anonimizado</strong> automaticamente
-          (nomes, CPF, RG, PIS, endereços) e o sistema guarda apenas o <strong>diferencial</strong> — o que é particular de
-          cada peça — usado para orientar a IA quando um caso semelhante aparece. Arquivos com o mesmo nome de um modelo
-          existente o <strong>atualizam</strong>; os demais <strong>criam novos modelos</strong>.
+          (nomes, CPF, RG, PIS, endereços) e o sistema extrai apenas o <strong>diferencial</strong> — teses, capítulos e
+          argumentos específicos que distinguem cada tipo de caso. Esse diferencial orienta a IA na redação quando um caso
+          semelhante aparece: <strong>quanto mais completa a peça original, mais precisa a minuta gerada</strong>. Arquivos
+          com o mesmo nome de um modelo existente o <strong>atualizam</strong>; os demais <strong>criam novos modelos</strong>.
         </div>
 
         <div className="bg-white border border-[#dadce0] rounded-xl p-4">
           <h2 className="text-sm font-semibold text-[#202124] mb-1">Template principal da minuta</h2>
-          <p className="text-xs text-[#5f6368] mb-3">Define a estrutura principal. O modelo de referência mais aderente continua sendo selecionado automaticamente para cada caso.</p>
+          <p className="text-xs text-[#5f6368] mb-3">
+            Define a estrutura fixa da petição (tópicos, ordem, texto-padrão). A IA preenche esse template com os dados
+            extraídos da entrevista — o modelo de referência mais aderente é selecionado automaticamente para enriquecer
+            os capítulos de mérito específicos do caso.
+          </p>
           {templates.length ? (
             <select
               value={templates.find((template) => template.is_default)?.id || ''}
@@ -237,23 +243,27 @@ export default function ModelosReferencia() {
             <h2 className="text-sm font-semibold text-[#202124] mb-1 flex items-center gap-2">
               <SlidersHorizontal className="w-4 h-4 text-[#1a73e8]" /> Integrações (consultas externas)
             </h2>
-            <p className="text-xs text-[#5f6368] mb-3">Ligue/desligue as consultas usadas ao gerar a petição.</p>
+            <p className="text-xs text-[#5f6368] mb-3">
+              Consultas automáticas que enriquecem os dados enviados à IA. Os resultados oficiais (Receita, ViaCEP, CNJ)
+              são injetados no prompt como contexto — a IA usa esses dados para preencher qualificação, endereço e
+              fundamentação jurisprudencial com precisão.
+            </p>
             <div className="space-y-1">
               <Toggle
                 label="Consulta de CNPJ (BrasilAPI)"
-                desc="Razão social e endereço oficiais das reclamadas"
+                desc="Busca razão social e endereço oficiais na Receita Federal. A IA usa esses dados para qualificar as reclamadas com precisão — sem isso, usa o que consta na entrevista."
                 checked={!!config.cnpj_ativo}
                 onChange={() => salvarConfig({ cnpj_ativo: !config.cnpj_ativo })}
               />
               <Toggle
                 label="Consulta de CEP (ViaCEP)"
-                desc="Completa endereço e município (competência)"
+                desc="Completa logradouro, bairro, município e UF. Define a competência territorial (vara/TRT) e valida o local de prestação — a IA usa o município para endereçar a petição."
                 checked={!!config.cep_ativo}
                 onChange={() => salvarConfig({ cep_ativo: !config.cep_ativo })}
               />
               <Toggle
                 label="Consulta ao DataJud (CNJ)"
-                desc="Contexto jurisprudencial por tema — requer a função de backend 'datajud' publicada"
+                desc="Busca processos similares por tema no tribunal selecionado. A IA recebe os resultados como reforço argumentativo — requer a função de backend 'datajud' publicada."
                 checked={!!config.datajud_ativo}
                 onChange={() => salvarConfig({ datajud_ativo: !config.datajud_ativo })}
               />
@@ -279,7 +289,9 @@ export default function ModelosReferencia() {
               <FileText className="w-4 h-4 text-[#1a73e8]" /> Template Word oficial (.docx)
             </h2>
             <p className="text-xs text-[#5f6368] mb-3">
-              Modelo .docx com campos {'{{ }}'} e flags {'{{# }}'} — usado no “Exportar fiel ao modelo”, preservando 100% da formatação.
+              Arquivo .docx com marcadores {'{{CAMPO}}'} (valores) e flags {'{{#condicao}}'} (liga/desliga seções).
+              A IA preenche os campos e ativa as flags conforme o caso — a exportação preserva 100% da formatação original
+              (fonte, timbrado, espaçamento). Sem o template, o preview funciona mas não há exportação fiel.
             </p>
             <div className="flex items-center gap-3 flex-wrap">
               <input type="file" accept=".docx" onChange={handleTemplateUpload} className="hidden" id="tmpl-docx" />
