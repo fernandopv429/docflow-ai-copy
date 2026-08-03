@@ -322,5 +322,18 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
     if (dados[fl] && !dados[cp]) dados[cp] = APURAR;
   }
 
+  // Fallback do capítulo de enquadramento (desvio): se a IA não redigir
+  // (redigirIA false ou falha), o marcador {{BLOCO_ENQUADRAMENTO}} do
+  // template ainda recebe um texto rico determinístico (não fica vazio).
+  // Quando a IA roda com sucesso, geracao.js sobrescreve pelo capítulo
+  // sob medida da especialista de IA.
+  if (dados.desvio_funcao) {
+    const atv = caso.desvio_atividades ||
+      'atribuições próprias do setor de Prevenção de Perdas, realizando conferência de mercadorias, controle e verificação da validade de produtos, registros operacionais, conferência de cargas, controle da quantidade de paletes e conferência de materiais';
+    dados.BLOCO_ENQUADRAMENTO =
+      `Não obstante contratado para exercer a função de ${(caso.funcao || 'VIGILANTE').toUpperCase()}, o reclamante era compelido, por determinação da 1ª reclamada e no interesse da 2ª reclamada, a exercer, de forma habitual, ${atv}, funções de maior complexidade e responsabilidade que extrapolam as tarefas típicas da função contratada, em flagrante desvio funcional, vedado pela cláusula 64ª, parágrafos primeiro e segundo, da Convenção Coletiva de Trabalho da Categoria. ` +
+      `Portanto, requer a condenação da reclamada ao pagamento da multa convencional de 50% (cinquenta por cento) do piso salarial da categoria por mês laborado, durante todo o período contratual, com reflexos em DSR, aviso prévio, férias acrescidas de 1/3, 13º salários e FGTS + 40%.`;
+  }
+
   return dados;
 }

@@ -64,6 +64,17 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
     );
   }
 
+  // 4) Desvio de função: substitui a narrativa FIXA do template por um
+  // marcador {{BLOCO_ENQUADRAMENTO}} preenchido pela IA (capítulo rico e
+  // sob medida). Fallback determinístico em dadosTemplate garante texto
+  // mesmo se a IA não rodar. Mantém o título "DO DESVIO DE FUNÇÃO" e o
+  // wrapper condicional {{#desvio_funcao}}...{{/desvio_funcao}}.
+  const NARRATIVA_DESVIO =
+    'Embora o reclamante tenha informado habitualmente à reclamada sobre o desvio de função, prática vedada pela Convenção Coletiva de Trabalho da Categoria (cláusula 64ª), uma vez que executava, além das funções de {{RECL_FUNCAO}}, {{DESVIO_ATIVIDADES}}, não recebeu qualquer compensação pecuniária a esse título. Portanto, a reclamada deve ser condenada ao pagamento da multa convencional de 50% por mês laborado, com reflexos nos DSRs, férias acrescidas de 1/3, 13º salários e FGTS + 40%.';
+  if (!xml.includes('BLOCO_ENQUADRAMENTO') && xml.includes(NARRATIVA_DESVIO)) {
+    xml = xml.replace(NARRATIVA_DESVIO, '{{BLOCO_ENQUADRAMENTO}}');
+  }
+
   zip.file('word/document.xml', xml);
   const blob = zip.generate({
     type: 'blob',
