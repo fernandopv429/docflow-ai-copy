@@ -148,6 +148,10 @@ export function extrairDeterministico(texto) {
   const intervalo = matchAny(t, /Intrajornada[:\s]*([0-9\s/àa-z]+?)(?:\n|$)/i);
   if (intervalo) caso.intervalo_usufruido = intervalo.trim();
 
+  // Prorrogação de jornada (horas extras antecedentes/sucedentes)
+  const he = matchAny(t, /HORAS\s+EXTRAS[:\s]*([^\n]+)/i);
+  if (he) caso.prorrogacao_jornada = he.trim();
+
   // Folgas trabalhadas — quantidade (média da faixa) e valor
   const folgaFaixa = /FOLGAS\s*LABORADAS[:\s]*(\d+)\s*a\s*(\d+)/i.exec(t);
   if (folgaFaixa) {
@@ -197,6 +201,11 @@ export function extrairDeterministico(texto) {
     caso.tem_dano_moral = true;
     const dano = matchAny(t, /DANO\s*MORAL[:\s]*\n?(.+?)(?:\n\n|$)/i);
     if (dano) caso.dano_fatos = dano.trim();
+  }
+
+  // Gratificação de função (bnus de meta/bonificao)
+  if (/gratifica[çc][ãa]o/i.test(t)) {
+    caso.tem_gratificacao = true;
   }
 
   // Vigilante -> periculosidade

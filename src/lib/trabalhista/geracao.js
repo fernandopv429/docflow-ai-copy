@@ -120,12 +120,21 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   if (caso.funcao && ESTADOS_CIVIS.test(caso.funcao.trim())) {
     caso.funcao = casoDet.funcao || '';
   }
-  const MARC_ENTREVISTA = /\b(?:FUN[ÇC][ÃA]O|DANO\s+MORAL|DIREITOS\s+LESADOS|JORNADA|SAL[ÁA]RIO|ADMISS[ÃA]O|RESCIS[ÃA]O|CEP|CNPJ|ENDERE[ÇC]O|ESTADO\s+CIVIL|TEMPO\s+LABORADO|DESvio|AC[ÚU]MULO|FOLGAS)\s*[:/]/i;
-  for (const campo of ['jornada_horario', 'dano_fatos', 'desvio_atividades', 'acumulo_atividades', 'local_prestacao', 'recl_endereco', 'funcao', 'escala']) {
+  const MARC_ENTREVISTA = /\b(?:FUN[ÇC][ÃA]O|DANO\s+MORAL|DIREITOS\s+LESADOS|JORNADA|SAL[ÁA]RIO|ADMISS[ÃA]O|RESCIS[ÃA]O|CEP|CNPJ|ENDERE[ÇC]O|ESTADO\s+CIVIL|TEMPO\s+LABORADO|DESvio|AC[ÚU]MULO|FOLGAS|HORAS\s+EXTRAS|GRATIFICA[ÇC][ÃA]O)\s*[:/]/i;
+  for (const campo of ['jornada_horario', 'desvio_atividades', 'acumulo_atividades', 'local_prestacao', 'recl_endereco', 'funcao', 'escala']) {
     if (caso[campo] && MARC_ENTREVISTA.test(String(caso[campo]))) {
       const det = casoDet[campo];
       caso[campo] = (det && !MARC_ENTREVISTA.test(String(det))) ? det : '';
     }
+  }
+  // Dano fatos: em vez de descartar, remove o rótulo da entrevista e preserva
+  // o conteúdo real (ex.: "/ DIREITOS LESADOS: Desconto indevido de 6%..." →
+  // "Desconto indevido de 6%..."). Se sobrar texto útil, mantém.
+  if (caso.dano_fatos && MARC_ENTREVISTA.test(String(caso.dano_fatos))) {
+    const limpo = String(caso.dano_fatos)
+      .replace(/^(?:\/\s*)?(?:DIREITOS\s+LESADOS|DANO\s+MORAL)\s*[:/]\s*/i, '')
+      .trim();
+    caso.dano_fatos = limpo.length >= 20 ? limpo : '';
   }
 
   // Merge dos atributos já extraídos no chat (conversarEntrevista) como fallback.
@@ -238,6 +247,10 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
 
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
+  if (!caso.salario) notify('⚠ Salário não encontrado na entrevista — cálculos rescisórios ficarão zerados. Informe o salário para gerar os valores.');
+  if (caso.data_admissao && caso.data_rescisao) {
+    notify(`Contrato: ${caso.data_admissao} a ${caso.data_rescisao} (${Math.round((new Date(caso.data_rescisao) - new Date(caso.data_admissao)) / 86400000 / 30.44)} meses) — função: ${caso.funcao || 'não informada'}.`);
+  }
 
   // Referências mais semelhantes (matching determinístico) — top 3 com
   // pontuação > 0. O "diferencial" de cada uma orienta a IA redatora nos
