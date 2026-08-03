@@ -20,6 +20,21 @@ import { formatBRL } from './mathUtils';
 // `numero`); quando houver mais de um ativo, o modelo usado é o do
 // primeiro config encontrado (fallback claude_sonnet_4_6).
 // ============================================================
+// Sanitiza a saída da IA: remove QUALQUER valor monetário (R$ X,XX) que o
+// modelo possa ter inserido na narrativa. Garantia determinística — os
+// valores oficiais são exclusivamente os do rol calculado por código
+// (mathUtils). A IA é instruída a não citar valores; esta função é a rede
+// de segurança caso desobedeça.
+function sanitizarValoresIA(texto) {
+  if (!texto) return texto;
+  return texto
+    .replace(/R\$\s*\d[\d.\s]*,\d{2}/gi, '')
+    .replace(/R\$\s*\d[\d.,]*/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim();
+}
+
 export const ESPECIALISTAS = [
   {
     numero: 'espinha',
@@ -70,7 +85,7 @@ export const ESPECIALISTAS = [
     instrucao:
       'Escreva APENAS o capítulo de dano moral, INCORPORANDO a narrativa concreta dos abusos relatados (campos dano_fatos/dano_supervisor) à fundamentação doutrinária padrão. NÃO trate de jornada, rescisão nem verbas.',
     promptPadrao:
-      'Você é advogado(a) trabalhista especialista em dano moral trabalhista. Redija o capítulo com a fundamentação doutrinária padrão e a narrativa concreta do caso. O valor é 10x a maior remuneração — mas NÃO calcule; use o valor fornecido em VALORES CALCULADOS.',
+      'Você é advogado(a) trabalhista especialista em dano moral trabalhista. Redija o capítulo com a fundamentação doutrinária padrão e a narrativa concreta do caso. O valor (10x a maior remuneração) é calculado por código e consta APENAS do rol de pedidos — NÃO cite o valor em R$ no capítulo.',
   },
   {
     numero: 'enquadramento',
@@ -164,7 +179,7 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
     '',
     'REGRAS DE SEGURANÇA (obrigatórias):',
     '- Argumente SOMENTE sobre fatos presentes no caso. Se faltar um fato essencial, escreva [CONFIRMAR: ...] em vez de inventar.',
-    '- NÃO faça aritmética. Use exatamente os valores de VALORES CALCULADOS.',
+    '- NÃO cite valores monetários (R$) nos capítulos nem faça aritmética. Todos os valores (rescisão, aviso prévio, 13º, férias, FGTS+multa, dano moral, honorários) são calculados por código e figuram APENAS no rol de pedidos. Mencione os reflexos (DSR, aviso prévio, férias +1/3, 13º, FGTS +40%) de forma qualitativa, sem números. Qualquer "R$ ..." no seu texto será removido pela pós-edição — não os inclua.',
     '- Cite SOMENTE as cláusulas listadas em CLÁUSULAS DA CCT. Nunca invente número de cláusula.',
     '- Escreva APENAS os capítulos solicitados abaixo. NÃO escreva endereçamento, qualificação das partes, valor da causa, honorários, data ou fecho — o sistema gera isso.',
     '- ESTRUTURA FIXA — quatro blocos legais por capítulo, nesta ordem: (1) FATOS — narre o que ocorreu no caso concreto em prosa articulada (sem bullets mecânicos); (2) FUNDAMENTO LEGAL/NORMATIVO — cite dispositivos da CLT, Súmulas do TST e cláusulas da CCT integrados ao texto (não como lista solta); (3) JURISPRUDÊNCIA — trate, quando relevante, a interpretação que ampara a tese; (4) PEDIDO/CONCLUSÃO — formule o requerimento com os reflexos (DSR, aviso prévio, férias+1/3, 13º, FGTS+40%).',
@@ -250,7 +265,7 @@ export async function redigirTesesIA({ caso, calculos, dadosCct, dados, onTool }
     const blocos = {};
     for (const e of ativos) {
       const texto = typeof obj[e.campo] === 'string' ? obj[e.campo].trim() : '';
-      if (texto) blocos[e.campo] = texto;
+      if (texto) blocos[e.campo] = sanitizarValoresIA(texto);
     }
     const escritos = Object.keys(blocos);
     if (escritos.length) notify(`Análise única concluída: ${escritos.length}/${ativos.length} capítulo(s) redigido(s).`);
