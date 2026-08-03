@@ -11,64 +11,67 @@ export function formatBRL(n) {
 
 // ============================================================
 // Valor por extenso (reais/centavos) — para SALARIO_EXT / VALOR_CAUSA_EXT
+// Conversão determinística, no padrão das petições do escritório (ex.: "vinte
+// e um mil, quatrocentos e oitenta e dois reais e vinte centavos"). Suporta
+// até centenas de milhões. Elimina divergência entre número e texto por
+// extenso (a IA NÃO escreve por extenso — só o código).
 // ============================================================
-const UNID = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez',
-  'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
-const DEZ = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
-const CEM = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+const UNIDADES = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+const DEZ_A_DEZENOVE = ['dez', 'onze', 'doze', 'treze', 'catorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+const DEZENAS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+const CENTENAS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
 
-function trioExtenso(n) {
-  // n de 0 a 999
+function grupoPorExtenso(n) {
   if (n === 0) return '';
   if (n === 100) return 'cem';
   const c = Math.floor(n / 100);
   const resto = n % 100;
   const partes = [];
-  if (c) partes.push(CEM[c]);
+  if (c) partes.push(CENTENAS[c]);
   if (resto) {
-    if (resto < 20) partes.push(UNID[resto]);
+    if (resto < 10) partes.push(UNIDADES[resto]);
+    else if (resto < 20) partes.push(DEZ_A_DEZENOVE[resto - 10]);
     else {
       const d = Math.floor(resto / 10);
       const u = resto % 10;
-      partes.push(u ? `${DEZ[d]} e ${UNID[u]}` : DEZ[d]);
+      partes.push(u ? `${DEZENAS[d]} e ${UNIDADES[u]}` : DEZENAS[d]);
     }
   }
   return partes.join(' e ');
 }
 
-function inteiroExtenso(n) {
+function inteiroPorExtenso(n) {
   if (n === 0) return 'zero';
   const milhoes = Math.floor(n / 1000000);
   const milhares = Math.floor((n % 1000000) / 1000);
   const centenas = n % 1000;
   const partes = [];
-  if (milhoes) partes.push(milhoes === 1 ? 'um milhão' : `${trioExtenso(milhoes)} milhões`);
-  if (milhares) partes.push(milhares === 1 ? 'mil' : `${trioExtenso(milhares)} mil`);
-  if (centenas) partes.push(trioExtenso(centenas));
-  // liga o último grupo com "e" quando cabível
-  if (partes.length > 1) {
-    const ultimo = partes.pop();
-    return `${partes.join(', ')} e ${ultimo}`;
-  }
-  return partes[0] || '';
+  if (milhoes) partes.push(milhoes === 1 ? 'um milhão' : `${grupoPorExtenso(milhoes)} milhões`);
+  if (milhares) partes.push(milhares === 1 ? 'mil' : `${grupoPorExtenso(milhares)} mil`);
+  if (centenas) partes.push(grupoPorExtenso(centenas));
+  return partes.join(', ');
 }
 
-export function numeroPorExtenso(valor) {
-  const v = round2(Number(valor));
-  if (v == null || isNaN(v)) return '';
-  const reais = Math.floor(v);
-  const centavos = Math.round((v - reais) * 100);
-  const partes = [];
-  if (reais > 0) partes.push(`${inteiroExtenso(reais)} ${reais === 1 ? 'real' : 'reais'}`);
-  if (centavos > 0) partes.push(`${inteiroExtenso(centavos)} ${centavos === 1 ? 'centavo' : 'centavos'}`);
-  if (!partes.length) return 'zero real';
-  return partes.join(' e ');
+// Converte valor em reais para a frase por extenso completa (reais + centavos
+// no plural/singular corretos). Cálculo de centavos via Math.round(*100) —
+// robusto a erro de ponto flutuante que afetava a versão anterior.
+export function valorPorExtenso(valor) {
+  const centavosTotais = Math.round((Number(valor) || 0) * 100);
+  const reais = Math.floor(centavosTotais / 100);
+  const centavos = centavosTotais % 100;
+  const centavosTxt = centavos ? `${inteiroPorExtenso(centavos)} ${centavos === 1 ? 'centavo' : 'centavos'}` : '';
+  if (!reais) return centavosTxt || 'zero reais';
+  const reaisTxt = `${inteiroPorExtenso(reais)} ${reais === 1 ? 'real' : 'reais'}`;
+  return centavos ? `${reaisTxt} e ${centavosTxt}` : reaisTxt;
 }
+
+// Alias p/ compatibilidade (callers antigos)
+export const numeroPorExtenso = valorPorExtenso;
 
 // "R$ 2.100,00 (dois mil e cem reais)"
 export function brlComExtenso(valor) {
   if (valor == null || isNaN(valor)) return '';
-  return `${formatBRL(valor)} (${numeroPorExtenso(valor)})`;
+  return `${formatBRL(valor)} (${valorPorExtenso(valor)})`;
 }
 
 // ============================================================
