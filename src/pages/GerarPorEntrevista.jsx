@@ -100,6 +100,7 @@ export default function GerarPorEntrevista() {
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
+        redigirIA: true,
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
 
