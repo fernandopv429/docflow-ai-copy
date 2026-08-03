@@ -33,6 +33,34 @@ const MULTAS =
 const FGTS =
   '<w:p><w:pPr><w:pStyle w:val="PargrafodaLista"/></w:pPr><w:r><w:t>\u2022 FGTS + multa de 40%: {{VALOR_FGTS}} + {{VALOR_MULTA_40}};</w:t></w:r></w:p>';
 
+// ------------------------------------------------------------
+// Helpers para abrir tópicos à redação da IA sem quebrar o determinístico:
+// inserem parágrafos novos com seção invertida — {{#BLOCO}} usa o texto da IA
+// quando presente; {{^BLOCO}} mantém a prosa ORIGINAL do template como fallback.
+// Operam por índice de parágrafo (robusto à fragmentação em vários <w:t>).
+// ------------------------------------------------------------
+function _paras(xml) {
+  const out = []; const re = /<w:p\b[\s\S]*?<\/w:p>/g; let m;
+  while ((m = re.exec(xml))) out.push({ raw: m[0], start: m.index, end: m.index + m[0].length });
+  return out;
+}
+function _textoPara(raw) {
+  return (raw.match(/<w:t\b[^>]*>[\s\S]*?<\/w:t>/g) || []).map((t) => t.replace(/<[^>]*>/g, '')).join('');
+}
+function _pPr(raw) { const m = raw.match(/<w:pPr>[\s\S]*?<\/w:pPr>/); return m ? m[0] : ''; }
+function _paraTx(conteudo, pPr = '') {
+  return `<w:p>${pPr}<w:r><w:t xml:space="preserve">${conteudo}</w:t></w:r></w:p>`;
+}
+// Insere, DEPOIS da posição `posDepois` e ANTES da posição `posAntes`, os tags de
+// abertura/fechamento do fallback invertido, com o bloco de IA no topo.
+function _envolver(xml, posAntes_ini, posDepois_fim, bloco, pPr) {
+  const antes = _paraTx(`{{#${bloco}}}{{${bloco}}}{{/${bloco}}}`, pPr) + _paraTx(`{{^${bloco}}}`);
+  const fim = _paraTx(`{{/${bloco}}}`);
+  let novo = xml.slice(0, posDepois_fim) + fim + xml.slice(posDepois_fim); // fim primeiro (posição maior)
+  novo = novo.slice(0, posAntes_ini) + antes + novo.slice(posAntes_ini);
+  return novo;
+}
+
 export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIPAL_template_corrigido.docx') {
   if (!url) throw new Error('URL do template não informada.');
   const resp = await fetch(url);
@@ -84,6 +112,39 @@ export async function baixarTemplateCorrigido(url, nomeArquivo = 'MODELO_PRINCIP
   const FRASE_MULTAS = 'O reclamante requer a aplica\u00e7\u00e3o da multa da cl\u00e1usula {{CCT_CLAUSULA_MULTA}} da CCT \u2013 {{CCT_ANO}} e as anteriores, eis que a reclamada n\u00e3o cumpriu com as obriga\u00e7\u00f5es convencionais, onde passamos a discorrer as infra\u00e7\u00f5es infra:';
   if (!xml.includes('BLOCO_MULTAS_CONVENCIONAIS') && xml.includes(FRASE_MULTAS)) {
     xml = xml.replace(FRASE_MULTAS, '{{BLOCO_MULTAS_CONVENCIONAIS}}');
+  }
+
+  // 6) DANO MORAL: o corpo do capítulo é o campo {{DANO_MORAL_FATO_ESPECIFICO}}
+  // (parágrafo único, não fragmentado). Troca por bloco de IA com fallback ao
+  // próprio campo determinístico.
+  if (!xml.includes('BLOCO_DANO_MORAL')) {
+    xml = xml.replace(
+      '{{DANO_MORAL_FATO_ESPECIFICO}}',
+      '{{#BLOCO_DANO_MORAL}}{{BLOCO_DANO_MORAL}}{{/BLOCO_DANO_MORAL}}{{^BLOCO_DANO_MORAL}}{{DANO_MORAL_FATO_ESPECIFICO}}{{/BLOCO_DANO_MORAL}}'
+    );
+  }
+
+  // 7) ESPINHA DA RESCISÃO: envolve os parágrafos das modalidades (do
+  // {{#sem_justa_causa}}“O reclamante foi admitido…” até o {{/coacao_demissao}})
+  // com {{^BLOCO_ESPINHA_RESCISAO}} — a IA sobrescreve a tese quando redige.
+  if (!xml.includes('BLOCO_ESPINHA_RESCISAO')) {
+    const ps = _paras(xml);
+    const ini = ps.findIndex((p) => { const t = _textoPara(p.raw); return t.includes('{{#sem_justa_causa}}') && t.includes('O reclamante foi admitido'); });
+    const fim = ini < 0 ? -1 : ps.findIndex((p, i) => i >= ini && _textoPara(p.raw).includes('{{/coacao_demissao}}'));
+    if (ini >= 0 && fim >= 0) xml = _envolver(xml, ps[ini].start, ps[fim].end, 'BLOCO_ESPINHA_RESCISAO', _pPr(ps[ini].raw));
+  }
+
+  // 8) SÚMULA 331: envolve o CONTEÚDO do wrapper {{#tem_tomadora}}…{{/tem_tomadora}}
+  // que contém o parágrafo “respondendo subsidiariamente… Súmula 331” (fragmentado
+  // em 33 runs — por isso envolvemos por parágrafo, sem tocar no texto interno).
+  if (!xml.includes('BLOCO_SUMULA_331')) {
+    const ps = _paras(xml);
+    const idxSub = ps.findIndex((p) => _textoPara(p.raw).includes('respondendo subsidiariamente'));
+    if (idxSub >= 0) {
+      let ini = -1; for (let i = idxSub; i >= 0; i--) { if (_textoPara(ps[i].raw).trim() === '{{#tem_tomadora}}') { ini = i; break; } }
+      let fim = -1; for (let i = idxSub; i < ps.length; i++) { if (_textoPara(ps[i].raw).trim() === '{{/tem_tomadora}}') { fim = i; break; } }
+      if (ini >= 0 && fim >= 0) xml = _envolver(xml, ps[ini].end, ps[fim].start, 'BLOCO_SUMULA_331', _pPr(ps[idxSub].raw));
+    }
   }
 
   zip.file('word/document.xml', xml);
