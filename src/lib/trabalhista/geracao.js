@@ -224,14 +224,25 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   // Cálculo 100% determinístico (a IA não faz aritmética).
   const calculos = calcularVerbasCaso(caso || {});
 
-  // Referência mais semelhante (matching determinístico) — informativo.
+  // Referências mais semelhantes (matching determinístico) — top 3 com
+  // pontuação > 0. O "diferencial" de cada uma orienta a IA redatora nos
+  // capítulos de mérito, sem inflar o prompt (orçamento dividido entre elas).
   let modeloSemelhante = null;
+  let modelosSemelhantes = [];
+  let referencias = [];
   try {
     const modelos = await listarModelosAtivos();
-    const ranking = rankearModelos(modelos, attrs || {});
-    if (ranking[0] && ranking[0].score > 0) {
-      modeloSemelhante = ranking[0].modelo;
-      if (modeloSemelhante.titulo) notify(`Referência mais semelhante: ${modeloSemelhante.titulo}`);
+    const ranking = rankearModelos(modelos, attrs || {}).filter((r) => r.score > 0).slice(0, 3);
+    modelosSemelhantes = ranking.map((r) => r.modelo);
+    modeloSemelhante = modelosSemelhantes[0] || null;
+    if (modelosSemelhantes.length) {
+      const titulos = modelosSemelhantes.map((m) => m.titulo).filter(Boolean).join(' • ');
+      if (titulos) notify(`Referências mais semelhantes: ${titulos}`);
+      const orcamento = Math.floor(4000 / modelosSemelhantes.length);
+      referencias = modelosSemelhantes.map((m) => ({
+        titulo: m.titulo || '',
+        diferencial: (m.diferencial || m.conteudo || m.resumo || '').slice(0, orcamento),
+      }));
     }
   } catch (e) {
     /* segue sem referência */
@@ -245,7 +256,7 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   // enquanto qualificação, valores e fecho seguem determinísticos.
   if (redigirIA) {
     try {
-      const { blocos, especialistasUsados } = await redigirTesesIA({ caso, calculos, dadosCct, dados, onTool });
+      const { blocos, especialistasUsados } = await redigirTesesIA({ caso, calculos, dadosCct, dados, referencias, onTool });
       Object.assign(dados, blocos);
       // O template usa {{DANO_MORAL_FATO_ESPECIFICO}} para a narrativa concreta
       // do dano moral (após a fundamentação constitucional fixa). Quando a IA
@@ -268,5 +279,6 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
     caso,
     alertasExtracao,
     modeloSemelhante: modeloSemelhante ? { titulo: modeloSemelhante.titulo } : null,
+    modelosSemelhantes: modelosSemelhantes.map((m) => ({ titulo: m.titulo })),
   };
 }

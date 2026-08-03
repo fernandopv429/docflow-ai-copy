@@ -170,10 +170,23 @@ function municipiosDoCaso(caso) {
   return out;
 }
 
+// Formata as referências mais semelhantes (diferencial de cada modelo) como
+// bloco de orientação para a IA redatora — pontos PARTICULARES de casos
+// parecidos, sem reproduzir o texto-padrão comum a toda petição.
+function resumoReferencias(referencias) {
+  const refs = (referencias || []).filter((r) => r && (r.diferencial || r.conteudo) && String(r.diferencial || r.conteudo).trim());
+  if (!refs.length) return '(nenhuma referência semelhante disponível — siga apenas os dispositivos legais, Súmulas e a CCT acima.)';
+  const linhas = refs.map((r, i) => `--- Referência ${i + 1}${r.titulo ? ` (${r.titulo})` : ''} ---\n${String(r.diferencial || r.conteudo || '').trim()}`);
+  return [
+    'CASOS SEMELHANTES NA BASE (orientação — use os pontos PARTICULARES abaixo como inspiração para as teses/capítulos deste tipo de caso; priorize a PRIMEIRA referência, mais semelhante; só inclua o que tiver suporte no relato da entrevista; o restante segue o modelo padrão):',
+    linhas.join('\n\n'),
+  ].join('\n');
+}
+
 // Contexto COMPARTILHADO da análise única. Fica no prompt da chamada —
 // prefixo estável, pronto para prompt caching quando o provedor/SDK
 // expuser esse controle (hoje reenviado por chamada).
-export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAtivos }) {
+export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAtivos, referencias = [] }) {
   return [
     'CONTEXTO COMPLETO DO CASO (leia tudo; você escreverá TODOS os capítulos ativos em uma única resposta JSON).',
     BLOCO_ENGENHARIA_JURIDICA,
@@ -204,6 +217,8 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
     'CLÁUSULAS DA CCT (grounding — só cite estas):',
     resumoCct(dadosCct),
     '',
+    resumoReferencias(referencias),
+    '',
     `CAPÍTULOS ATIVOS NESTA PEÇA: ${blocosAtivos.join(', ')}.`,
   ].join('\n');
 }
@@ -211,7 +226,7 @@ export function montarContextoCompartilhado({ caso, calculos, dadosCct, blocosAt
 // Orquestrador: acende os capítulos conforme as flags (determinístico),
 // faz UMA ÚNICA chamada à IA devolvendo TODOS os capítulos ativos de
 // uma vez (JSON) e devolve os blocos por campo do template.
-export async function redigirTesesIA({ caso, calculos, dadosCct, dados, onTool } = {}) {
+export async function redigirTesesIA({ caso, calculos, dadosCct, dados, referencias = [], onTool } = {}) {
   const notify = (m) => { try { onTool?.(m); } catch (e) { /* ignora */ } };
 
   let configs = [];
@@ -230,7 +245,7 @@ export async function redigirTesesIA({ caso, calculos, dadosCct, dados, onTool }
   if (!ativos.length) return { blocos: {}, especialistasUsados: [] };
 
   const blocosAtivos = ativos.map((e) => e.nome);
-  const contexto = montarContextoCompartilhado({ caso: c, calculos: calculos || [], dadosCct, blocosAtivos });
+  const contexto = montarContextoCompartilhado({ caso: c, calculos: calculos || [], dadosCct, blocosAtivos, referencias });
 
   // Schema JSON dinâmico: uma propriedade string por capítulo ativo.
   // O root é sempre "object" (req. do InvokeLLM).
