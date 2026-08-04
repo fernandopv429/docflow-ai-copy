@@ -4,7 +4,7 @@ import { BLOCO_ENGENHARIA_JURIDICA } from './engenhariaJuridica';
 import { BLOCO_REGRAS_QUALIDADE } from './regrasQualidadeFav';
 import { BLOCO_MATRIZ_TOPICOS } from './matrizTopicos';
 import { blocoRegrasCriticas } from './regrasCriticas';
-import { formatBRL } from './mathUtils';
+import { formatBRL, temDanoMoralConcreto } from './mathUtils';
 
 // ============================================================
 // REDAÇÃO POR IA — ANÁLISE ÚNICA (um único LLM para todos os capítulos)
@@ -70,9 +70,9 @@ export const ESPECIALISTAS = [
     numero: 'dano_moral',
     nome: 'Dano moral',
     campo: 'BLOCO_DANO_MORAL',
-    ativo: (d, c) => !!c.tem_dano_moral,
+    ativo: (d, c) => temDanoMoralConcreto(c),
     instrucao:
-      'Escreva o capítulo COMPLETO da narrativa dos fatos do dano moral — parágrafos articulados em prosa jurídica fluida, persuasiva e COERENTE, com o contexto completo do caso (NÃO frases isoladas nem fragmentos soltos). Narre os abusos sofridos pelo reclamante (campos dano_fatos/dano_supervisor: nome do supervisor, perseguição, humilhação, desconto indevido de consignado, etc.), o contexto em que ocorreram, a habitualidade das condutas e o impacto sobre a dignidade pessoal e a honra do autor, encadeando os fatos em uma narrativa articulada e completa. NÃO escreva a fundamentação constitucional/doutrinária (art. 5º, V/X, CF; art. 186, 927, CC) — ela já consta do template antes deste bloco. NÃO trate de jornada, rescisão nem verbas. NÃO cite valores em R$.',
+      'Escreva o capítulo COMPLETO da narrativa dos fatos do dano moral — parágrafos articulados em prosa jurídica fluida, persuasiva e COERENTE, com o contexto completo do caso (NÃO frases isoladas nem fragmentos soltos). Conecte TODOS os abusos concretos do caso que fundamentam o pedido — desvio/acúmulo de função exaustivo, supressão de intervalos/descansos, pagamentos por fora, descontos indevidos, perseguição/humilhação (campos dano_fatos/dano_supervisor/desvio_atividades/acumulo_atividades), o contexto em que ocorreram, a habitualidade das condutas e o impacto sobre a dignidade pessoal e a honra do autor, encadeando os fatos em uma narrativa articulada e completa. NÃO escreva a fundamentação constitucional/doutrinária (art. 5º, V/X, CF; art. 186, 927, CC) — ela já consta do template antes deste bloco. NÃO trate de jornada, rescisão nem verbas. NÃO cite valores em R$ (o pedido de 10x a maior remuneração já está fixado no rol de pedidos, calculado por código).',
     promptPadrao:
       'Você é advogado(a) trabalhista especialista em dano moral. Redija o capítulo COMPLETO da narrativa dos fatos concretos do dano moral, em prosa articulada, persuasiva e coerente, com o contexto completo do caso — sem a fundamentação doutrinária (já presente no template) e sem valores em R$ (calculados por código).',
   },
