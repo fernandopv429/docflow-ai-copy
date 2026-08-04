@@ -247,6 +247,7 @@ export default function EntrevistaSession({ sessionId, active = true }) {
           {
             role: 'confirm_geracao',
             pending: { texto: textoCompleto, urls, attrs: novoAttrs, sources: fontesAtuais },
+            faltando: res?.faltando || [],
             status: null,
           },
         ]);
@@ -358,6 +359,7 @@ export default function EntrevistaSession({ sessionId, active = true }) {
                   <ConfirmacaoGeracao
                     key={i}
                     status={m.status}
+                    faltando={m.faltando}
                     disabled={generating || sending}
                     onConfirmar={() => confirmarGeracao(m.pending, i)}
                     onRejeitar={() => rejeitarGeracao(i)}

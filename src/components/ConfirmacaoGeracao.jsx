@@ -1,7 +1,7 @@
 import React from 'react';
 import { FileDown, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-export default function ConfirmacaoGeracao({ status, disabled, onConfirmar, onRejeitar }) {
+export default function ConfirmacaoGeracao({ status, disabled, onConfirmar, onRejeitar, faltando }) {
   if (status === 'aprovado') {
     return (
       <div className="flex justify-start">
@@ -30,6 +30,16 @@ export default function ConfirmacaoGeracao({ status, disabled, onConfirmar, onRe
         <p className="text-xs text-[#5f4e00] mb-2">
           A IA entendeu que há informações pendentes. Você pode gerar agora com os dados disponíveis ou responder as perguntas acima antes de prosseguir.
         </p>
+        {faltando?.length > 0 && (
+          <div className="mb-2 rounded-md bg-white/60 border border-[#f9d75b] px-2.5 py-2">
+            <p className="text-[11px] font-semibold text-[#b26500] mb-1">Informações pendentes:</p>
+            <ul className="text-xs text-[#5f4e00] space-y-0.5 list-disc pl-4">
+              {faltando.map((item, i) => (
+                <li key={i}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex gap-2">
           <button
             onClick={onConfirmar}
