@@ -271,6 +271,26 @@ export async function redigirTesesIA({ caso, calculos, dadosCct, dados, referenc
     return `### ${e.campo} — ${e.nome}\nPapel: ${promptSistema}\nTarefa: ${instrucao}`;
   });
 
+  // PEDIDOS_MULTAS: lista individualizada de violações convencionais (array,
+  // não string) que substitui a antiga lista fixa do template — o modelo .docx
+  // tem um laço {{#pedidos_multas}}{{.}}{{/pedidos_multas}} que repete um item
+  // de lista por elemento do array. Só pedida quando o capítulo de multas
+  // convencionais está ativo (mesma condição do BLOCO_MULTAS_CONVENCIONAIS).
+  const multasAtivo = ativos.some((e) => e.numero === 'multas_convencionais');
+  if (multasAtivo) {
+    properties.PEDIDOS_MULTAS = {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Lista de violações convencionais específicas e individualizadas cometidas pela reclamada, uma frase curta por item terminando em ";" (mesmo estilo de "Não remunera corretamente as horas extraordinárias, cláusula 16ª;"). Cite o número da cláusula da CCT APENAS quando ela estiver listada em CLÁUSULAS DA CCT (grounding) — nunca invente número. Sem cláusula conhecida, descreva a violação legal genérica sem citar cláusula (ex.: FGTS, DSR). Liste SOMENTE violações que correspondam às teses realmente ativas neste caso (periculosidade, 10 minutos, folgas/feriados 100%, desvio/acúmulo, vale-transporte/alimentação nas folgas, jornada extraordinária etc. — só as que se aplicam) — NÃO copie uma lista genérica fixa. Entre 3 e 10 itens. Sem valores em R$.',
+    };
+    tarefas.push(
+      '### PEDIDOS_MULTAS — Lista individualizada de multas convencionais\n' +
+      'Papel: Você é advogado(a) trabalhista especialista em direito coletivo.\n' +
+      'Tarefa: Liste em um array de strings as violações convencionais específicas deste caso que fundamentam a multa de 2% por cláusula descumprida — cite a cláusula da CCT SOMENTE quando grounded em CLÁUSULAS DA CCT; sem cláusula conhecida, descreva sem citar número. Adapte às teses realmente ativas no caso (não reproduza uma lista padrão).'
+    );
+  }
+
   notify(`Redigindo ${ativos.length} capítulo(s) em análise única (uma chamada à IA)...`);
 
   const prompt = [
