@@ -231,6 +231,11 @@ Responda APENAS com o objeto JSON.`;
 // rótulo ("Sem justa causa: 07/12/2025"), formato comum nas entrevistas.
 const RESCISAO_RE = /(?:demiss[aã]o|rescis[aã]o|dispensa|desligamento|sa[íi]da|t[eé]rmino|(?:sem\s+)?justa\s+causa|pedido\s+de\s+demiss[aã]o|acordo)\s*:?\s*(?:em\s*)?(\d{2}\/\d{2}\/\d{4})/i;
 
+// Formulário padronizado (ZapSign): "TEMPO LABORADO: DD/MM/YYYY - DD/MM/YYYY" traz a
+// data de admissão (1ª) e de rescisão (2ª) juntas, sem as palavras "admissão"/"rescisão"
+// por perto — sem isto, o aviso "ainda falta data de admissão/rescisão" dispara errado.
+const TEMPO_LABORADO_RE = /TEMPO\s*LABORADO\s*:?\s*\d{2}\/\d{2}\/\d{4}\s*-\s*\d{2}\/\d{2}\/\d{4}/i;
+
 const MODALIDADE_RE = [
   [/rescis[aã]o\s+indireta|art\.?\s*483/i, 'rescisao_indireta'],
   [/revers[aã]o\s+da\s+(?:justa\s+causa|dispensa)/i, 'reversao_justa_causa'],
@@ -295,8 +300,9 @@ function inferirAtributosEntrevista(transcript) {
   if (!funcao) faltando.push('Função do reclamante');
   if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
-  if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)) faltando.push('Data de admissão');
-  if (!RESCISAO_RE.test(texto)) faltando.push('Data de rescisão/demissão');
+  const temTempoLaborado = TEMPO_LABORADO_RE.test(texto);
+  if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto) && !temTempoLaborado) faltando.push('Data de admissão');
+  if (!RESCISAO_RE.test(texto) && !temTempoLaborado) faltando.push('Data de rescisão/demissão');
   if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário (se não informar, será adotado o piso da CCT)');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
   // Salário não bloqueia a geração — o piso salarial da CCT é usado como fallback.
