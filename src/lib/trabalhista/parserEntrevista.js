@@ -84,7 +84,7 @@ const CASO_SCHEMA = {
     // Flags das teses (true APENAS com suporte no relato + campos de apoio validados)
     tem_acumulo: { type: 'boolean' },
     tem_desvio: { type: 'boolean', description: 'Exercia função superior/diversa (desvio de função)' },
-    tem_gratificacao: { type: 'boolean', description: 'Vigilante condutor sem gratificação de 10% (cláusula 3ª)' },
+    tem_gratificacao: { type: 'boolean', description: 'true APENAS se a entrevista indicar EXPLICITAMENTE que há gratificação de função devida (checkbox "Sim", valor de gratificação/bônus mencionado, ou vigilante-condutor sem a gratificação de 10% da cláusula 3ª). Se o formulário marcar "Não" para gratificação ou não mencionar o assunto, retorne false. NUNCA marque true só porque a função é vigilante.' },
     tem_dez_min_cct: { type: 'boolean', description: 'Vigilância: não concessão dos 10 min de descanso (cláusula 33ª)' },
     tem_salarios_aberto: { type: 'boolean', description: 'Há salários em aberto/não pagos' },
     tem_adic_noturno: { type: 'boolean', description: 'Houve labor em horário noturno' },
@@ -330,12 +330,14 @@ SALÁRIO (CRÍTICO — sem salário, TODOS os cálculos rescisórios ficam zerad
 - maior_remuneracao: se a entrevista mencionar "maior remuneração" ou um valor diferente do salário base, extraia-o; senão, o sistema usa o salário.
 - Se não informado explicitamente MAS a função é vigilante e há CCT conhecida, NÃO invente — deixe em branco.
 - GRATIFICAÇÃO: se houver "Gratificação: R$ 125,00" ou "Bônus de meta: R$ 125,00", extraia gratificacao_valor = 125.0 E marque tem_gratificacao = true.
+- Se o formulário tiver um checkbox do tipo "Recebe algum tipo de gratificação: (x) Não", ou não mencionar gratificação em lugar nenhum, marque tem_gratificacao = false explicitamente. A gratificação de 10% da cláusula 3ª (vigilante-condutor) só se aplica se a entrevista indicar que ele conduzia viatura/veículo E não recebia essa gratificação — sem essa indicação específica, NUNCA marque tem_gratificacao = true apenas por a função ser "vigilante".
 
 FOLGAS TRABALHADAS (FT):
-- "5 a 6 FTs" → ft_qtd_media = 5.5 (use a MÉDIA da faixa).
-- "180 a 200" valor das FTs → val_ft = 190.0 (use a MÉDIA da faixa).
+- O formulário costuma trazer DOIS números parecidos e PRÓXIMOS um do outro no mesmo bloco — NÃO os confunda:
+  • "Quantidade: 5 a 6" → é a QUANTIDADE de folgas por mês → ft_qtd_media = 5.5 (média da faixa).
+  • "Valor recebido: 180 a 200" → é o VALOR em R$ pago por CADA folga → val_ft = 190.0 (média da faixa).
+- tem_ft = true sempre que houver FTs relatadas. REGRA OBRIGATÓRIA: sempre que marcar tem_ft = true, preencha ft_qtd_media JUNTO, no mesmo retorno — nunca marque tem_ft = true deixando ft_qtd_media vazio/omitido. Se ft_qtd_media ficar sem valor, o sistema desliga automaticamente a seção inteira de folgas trabalhadas, mesmo com tem_ft = true.
 - "pagos fora da folha" / "via pix" → tem_integracao_por_fora = true, valor_por_fora = val_ft (as FTs eram pagas informalmente).
-- tem_ft = true sempre que houver FTs relatadas.
 
 JORNADA E HORAS EXTRAS:
 - Escala 12x36 com horário "18:30 às 07:30" ou "19h às 7h" → tem_adic_noturno = true (labor após 22h é noturno automático).
