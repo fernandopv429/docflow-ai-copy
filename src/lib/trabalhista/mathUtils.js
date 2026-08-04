@@ -210,6 +210,24 @@ export function danoMoral10x(maiorRemuneracao) {
 // Itens que dependem de contagem de horas (HE, noturno, art. 71, minutos)
 // NÃO são estimados aqui — ficam "a apurar em liquidação" no template.
 // ============================================================
+// Fonte Única de verdade: quando o dano moral tem lastro fatico suficiente
+// para justificar o pedido (10x a maior remuneração). Usada tanto para
+// disparar o CÁLCULO do valor (calcularVerbasCaso) quanto para decidir se o
+// PARÁGRAFO narrativo (BLOCO_DANO_MORAL) deve ser preenchido — antes essas
+// duas decisões usavam critérios diferentes (a condição do texto só olhava
+// caso.tem_dano_moral), o que gerava petições com o VALOR calculado mas o
+// parágrafo vazio ("[A PREENCHER: BLOCO_DANO_MORAL]").
+export function temDanoMoralConcreto(caso = {}) {
+  return Boolean(
+    caso.tem_dano_moral
+    || (caso.dano_fatos && String(caso.dano_fatos).trim().length >= 20)
+    || (caso.dano_supervisor && String(caso.dano_supervisor).trim().length >= 20)
+    || caso.tem_desvio
+    || (caso.tem_ft && caso.tem_integracao_por_fora)
+    || caso.tem_insalubridade
+  );
+}
+
 export function calcularVerbasCaso(caso = {}) {
   const itens = [];
   const salario = Number(caso.salario) || null;
@@ -291,12 +309,7 @@ export function calcularVerbasCaso(caso = {}) {
   // (dano_fatos vazio/curto), mas a narrativa do dano moral é sempre gerada
   // no template (sem condicional). Dispara o cálculo também quando há
   // conteúdo de dano moral (fatos/supervisor) ou teses que o fundamentam.
-  const temConteudoDanoMoral = caso.tem_dano_moral
-    || (caso.dano_fatos && String(caso.dano_fatos).trim().length >= 20)
-    || (caso.dano_supervisor && String(caso.dano_supervisor).trim().length >= 20)
-    || caso.tem_desvio
-    || (caso.tem_ft && caso.tem_integracao_por_fora)
-    || caso.tem_insalubridade;
+  const temConteudoDanoMoral = temDanoMoralConcreto(caso);
   if (temConteudoDanoMoral && maiorRem) {
     itens.push({ item: 'Dano moral (10x remuneração)', memoria: '10x a maior remuneração na função', valor: danoMoral10x(maiorRem) });
   }
