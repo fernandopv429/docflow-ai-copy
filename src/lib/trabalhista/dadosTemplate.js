@@ -1,4 +1,4 @@
-import { formatBRL, round2, brlComExtenso } from './mathUtils';
+import { formatBRL, round2, brlComExtenso, temDanoMoralConcreto } from './mathUtils';
 
 // ============================================================
 // FONTE ÚNICA DE DADOS DA PETIÇÃO
@@ -442,7 +442,10 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
 
   // Fallback do DANO MORAL: narrativa concreta determinística (mesma do
   // DANO_MORAL_FATO_ESPECIFICO). A IA sobrescreve via BLOCO_DANO_MORAL.
-  if (!dados.BLOCO_DANO_MORAL && caso.tem_dano_moral) {
+  // Usa a MESMA condição do cálculo do valor (temDanoMoralConcreto) — antes
+  // só checava caso.tem_dano_moral, deixando o parágrafo vazio em casos onde
+  // o VALOR já tinha sido calculado (ex.: por desvio de função).
+  if (!dados.BLOCO_DANO_MORAL && temDanoMoralConcreto(caso)) {
     dados.BLOCO_DANO_MORAL = dados.DANO_MORAL_FATO_ESPECIFICO || narrativaDanoMoral(caso);
   }
 
