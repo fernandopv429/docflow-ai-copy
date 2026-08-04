@@ -319,6 +319,12 @@ export async function redigirTesesIA({ caso, calculos, dadosCct, dados, referenc
       const texto = typeof obj[e.campo] === 'string' ? obj[e.campo].trim() : '';
       if (texto) blocos[e.campo] = sanitizarValoresIA(texto);
     }
+    if (multasAtivo && Array.isArray(obj.PEDIDOS_MULTAS)) {
+      const lista = obj.PEDIDOS_MULTAS
+        .map((s) => (typeof s === 'string' ? sanitizarValoresIA(s.trim()) : ''))
+        .filter(Boolean);
+      if (lista.length) blocos.pedidos_multas = lista;
+    }
     const escritos = Object.keys(blocos);
     if (escritos.length) notify(`Análise única concluída: ${escritos.length}/${ativos.length} capítulo(s) redigido(s).`);
     else notify('Análise única não retornou capítulos — a peça segue com o texto-padrão do template.');
