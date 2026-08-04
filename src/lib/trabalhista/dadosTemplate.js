@@ -463,5 +463,37 @@ export function montarDadosTemplate({ caso = {}, calculos = [], attrs = {}, dado
       `A 2ª reclamada, na qualidade de tomadora dos serviços, responde subsidiariamente pelas obrigações trabalhistas contraídas pela 1ª reclamada em relação ao reclamante, com fundamento na Súmula 331 do Tribunal Superior do Trabalho e nos artigos 4º e 5º do Decreto-Lei nº 200/1967, eis que o obreiro desempenhava suas atividades integrado à atividade-fim da tomadora, exercendo funções essenciais e permanentes, o que atrai a responsabilidade subsidiária da contratante pelos créditos deferidos nesta ação.`;
   }
 
+  // Fallback do rol de MULTAS CONVENCIONAIS: lista individualizada por caso
+  // (substitui a antiga lista fixa do template, sempre igual em toda peça).
+  // A IA sobrescreve via `pedidos_multas` (redacaoTeses.js) quando ativa,
+  // citando o número real da cláusula da CCT; este fallback determinístico
+  // só roda quando a redação por IA está desligada ou falha — nunca deixa o
+  // laço {{#pedidos_multas}} vazio.
+  if (!dados.pedidos_multas) {
+    const clMulta = caso.cct_clausula_multa ? `, cláusula ${caso.cct_clausula_multa}` : '';
+    const itensMulta = [];
+    if (caso.jornada_horario || dados.escala_12x36 || dados.escala_4x2) {
+      itensMulta.push('Não remunera corretamente as horas extraordinárias, com o adicional convencional previsto na CCT;');
+    }
+    if (dados.folgas_trabalhadas) {
+      itensMulta.push('Não remunera corretamente as horas extras de 100% relativas às folgas e feriados trabalhados;');
+    }
+    if (dados.periculosidade) {
+      itensMulta.push('Não remunera corretamente o adicional de periculosidade sobre as horas extraordinárias;');
+    }
+    if (dados.dez_minutos_cct) {
+      itensMulta.push(`Não concessão dos 10 (dez) minutos de descanso a cada hora trabalhada${clMulta};`);
+    }
+    if (dados.vale_transporte) itensMulta.push('Não concede o vale-transporte nas folgas trabalhadas;');
+    if (dados.auxilio_alimentacao) itensMulta.push('Não concede o auxílio-alimentação nas folgas trabalhadas;');
+    if (dados.desvio_funcao || dados.acumulo_funcao) {
+      itensMulta.push(`Não remunera corretamente o desvio/acúmulo de função${clMulta};`);
+    }
+    itensMulta.push('Não remunera o FGTS corretamente;');
+    itensMulta.push('Não remunera corretamente os seus DSR´s;');
+    if (temDanoMoralConcreto(caso)) itensMulta.push('Incorre em dano moral em virtude das condições supramencionadas;');
+    dados.pedidos_multas = itensMulta;
+  }
+
   return dados;
 }
