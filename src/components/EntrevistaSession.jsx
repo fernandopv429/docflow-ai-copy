@@ -53,6 +53,10 @@ export default function EntrevistaSession({ sessionId, active = true }) {
   const [attrs, setAttrs] = useState(null);
   const [config, setConfig] = useState(null);
   const [ultimaGeracao, setUltimaGeracao] = useState(null);
+  // Caso aberto a partir da fila de webhooks. Quando presente, a geração
+  // (Atualizar) e o reconhecimento do chat usam estes dados em vez de
+  // reextrair do resumo curto exibido nas mensagens.
+  const [casoWebhook, setCasoWebhook] = useState(null);
   const [filaOpen, setFilaOpen] = useState(false);
   const [filaCount, setFilaCount] = useState(0);
 
@@ -114,12 +118,16 @@ export default function EntrevistaSession({ sessionId, active = true }) {
     if (generating) return;
     setGenerating(true);
     try {
-      const geracaoTexto = opts.texto ?? userText;
+      // Caso de webhook aberto na fila: usa o caso estruturado já mapeado
+      // (casoPreMapeado) em vez de reextrair do resumo curto do chat, e o
+      // texto integral da entrevista como contexto.
+      const usarCasoWebhook = !opts.casoPreMapeado && casoWebhook;
+      const geracaoTexto = opts.texto ?? (userText || (usarCasoWebhook ? casoWebhook.entrevista_texto : ''));
       const { dados, dadosReceita, dadosCep, dadosDatajud, dadosCct, calculos, caso, modeloSemelhante } = await gerarDadosPeca({
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
-        casoPreMapeado: opts.casoPreMapeado ?? null,
+        casoPreMapeado: opts.casoPreMapeado ?? (usarCasoWebhook ? casoWebhook.caso : null),
         redigirIA: true,
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
@@ -212,9 +220,15 @@ export default function EntrevistaSession({ sessionId, active = true }) {
         setDocumentSources(fontesAtuais);
       }
 
-      const transcript = novasMsgs
+      // Caso de webhook: reinjeta o texto integral da entrevista como contexto
+      // no transcript, para a IA enxergar os dados do caso (e não só o resumo
+      // curto exibido no chat) ao processar uma correção.
+      const transcriptBase = novasMsgs
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, text: m.text || '' }));
+      const transcript = casoWebhook?.entrevista_texto
+        ? [{ role: 'user', text: casoWebhook.entrevista_texto }, ...transcriptBase]
+        : transcriptBase;
       const res = await conversarEntrevista({
         transcript,
         fileUrls: urls,
@@ -309,6 +323,7 @@ export default function EntrevistaSession({ sessionId, active = true }) {
     setUltimaGeracao({ caso, calculos, dados });
     setReviewConfirmed(false);
     setAttrs(caso);
+    setCasoWebhook({ caso, entrevista_texto: casoDb.entrevista_texto || '' });
   };
 
   const confirmarGeracao = async (pending, msgIndex) => {
