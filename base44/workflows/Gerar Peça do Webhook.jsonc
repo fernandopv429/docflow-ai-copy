@@ -1,0 +1,40 @@
+{
+  "name": "Gerar Pe\u00e7a do Webhook",
+  "description": "Ao receber uma entrevista via webhook (WebhookEvento 'entrevista.salva'), gera automaticamente a peti\u00e7\u00e3o inicial no backend e armazena o resultado pronto em CasoTrabalhista",
+  "trigger": {
+    "config": {
+      "trigger_type": "entity",
+      "entity_name": "WebhookEvento",
+      "events": [
+        "create"
+      ]
+    },
+    "condition": "${ .trigger.data.evento_tipo == \"entrevista.salva\" and .trigger.data.status == \"recebido\" }"
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "gerar_peca_webhook",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "gerar_peca": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "gerarPecaWebhook",
+            "args": {
+              "evento_id": "${ .trigger.entity_id }"
+            }
+          },
+          "then": "end",
+          "x-base44": {
+            "title": "Gerar peti\u00e7\u00e3o",
+            "description": "Mapeia, enriquece, calcula e redige a pe\u00e7a"
+          }
+        }
+      }
+    ]
+  }
+}

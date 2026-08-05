@@ -23,7 +23,7 @@ import {
 } from '@/lib/trabalhista/previewTemplate';
 import ConfirmacaoGeracao from '@/components/ConfirmacaoGeracao';
 import FilaWebhooks from '@/components/FilaWebhooks';
-import { mapearCasoDeWebhook } from '@/lib/trabalhista/mapearWebhook';
+import { montarDadosTemplate } from '@/lib/trabalhista/dadosTemplate';
 
 // ============================================================
 // Instância isolada do agente de entrevista.
@@ -67,11 +67,11 @@ export default function EntrevistaSession({ sessionId, active = true }) {
   }, []);
 
   const atualizarFilaCount = () => {
-    base44.entities.WebhookEvento.filter({ evento_tipo: 'entrevista.salva', status: 'recebido' }, '-created_date', 100)
-      .then((l) => setFilaCount(l?.length || 0))
+    base44.entities.CasoTrabalhista.list('-created_date', 50)
+      .then((l) => setFilaCount((l || []).filter((c) => c.analise_json?.origem === 'webhook').length))
       .catch(() => {});
   };
-  useEffect(() => { atualizarFilaCount(); }, []);
+  useEffect(() => { atualizarFilaCount(); const t = setInterval(atualizarFilaCount, 15000); return () => clearInterval(t); }, []);
 
   useEffect(() => {
     if (active) endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -278,20 +278,37 @@ export default function EntrevistaSession({ sessionId, active = true }) {
     }
   };
 
-  const abrirCasoWebhook = async (evento) => {
-    const data = evento?.payload?.data;
-    if (!data) return;
-    const caso = mapearCasoDeWebhook(data);
-    const nome = data.nome_cliente || 'Caso do webhook';
-    const texto = data.fatos_narrados || `Caso recebido via webhook — ${nome}`;
+  const abrirCasoPronto = async (casoDb) => {
+    const aj = casoDb?.analise_json || {};
+    const caso = aj.caso || {};
+    const calculos = aj.calculos || [];
+    const dadosReceita = aj.dadosReceita || [];
+    const dadosCep = aj.dadosCep || [];
+    const blocos = aj.blocos || {};
     setFilaOpen(false);
     setMessages([
-      { role: 'user', text: `📋 Caso recebido via webhook — ${nome}` },
-      { role: 'assistant', text: 'Gerando a petição com os dados estruturados (sem reextração por IA)...' },
+      { role: 'user', text: `📋 Caso recebido via webhook — ${casoDb.recl_nome || caso.recl_nome || 'Caso'}` },
+      { role: 'assistant', text: 'Petição gerada automaticamente pelo webhook. Confira o documento ao lado e exporte quando revisar.' },
     ]);
-    base44.entities.WebhookEvento.update(evento.id, { status: 'processado', processado_em: new Date().toISOString() }).catch(() => {});
-    atualizarFilaCount();
-    await gerarMinuta({ texto, casoPreMapeado: caso, attrs: caso, urls: [] });
+    // Reconstroi o `dados` (determinístico) + merge dos capítulos redigidos pela IA
+    let dados = {};
+    try {
+      dados = montarDadosTemplate({ caso, calculos, attrs: caso, dadosReceita, dadosCep });
+    } catch (e) { console.error(e); }
+    Object.assign(dados, blocos);
+    if (blocos.BLOCO_DANO_MORAL) dados.DANO_MORAL_FATO_ESPECIFICO = blocos.BLOCO_DANO_MORAL;
+    // Preview do template preenchido
+    let html = '';
+    if (config?.template_docx_url) {
+      try {
+        const esqueleto = await carregarEsqueletoTemplate(config.template_docx_url);
+        html = preencherEsqueleto(esqueleto, dados, { highlight: true });
+      } catch (e) { console.error(e); }
+    }
+    setDocHtml(html);
+    setUltimaGeracao({ caso, calculos, dados });
+    setReviewConfirmed(false);
+    setAttrs(caso);
   };
 
   const confirmarGeracao = async (pending, msgIndex) => {
@@ -565,7 +582,7 @@ export default function EntrevistaSession({ sessionId, active = true }) {
           </div>
         </div>
       </div>
-      <FilaWebhooks open={filaOpen} onOpenChange={setFilaOpen} onSelecionar={abrirCasoWebhook} />
+      <FilaWebhooks open={filaOpen} onOpenChange={setFilaOpen} onSelecionar={abrirCasoPronto} />
       <SessionLogsModal open={logsOpen} onOpenChange={setLogsOpen} messages={[...messages, ...consoleLogs]} />
     </div>
   );
