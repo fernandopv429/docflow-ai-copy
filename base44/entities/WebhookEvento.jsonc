@@ -1,0 +1,49 @@
+{
+  "name": "WebhookEvento",
+  "type": "object",
+  "properties": {
+    "origem": {
+      "type": "string",
+      "title": "Origem"
+    },
+    "evento_tipo": {
+      "type": "string",
+      "title": "Tipo do Evento"
+    },
+    "evento_id": {
+      "type": "string",
+      "title": "ID do Evento (idempot\u00eancia)"
+    },
+    "payload": {
+      "type": "object",
+      "title": "Payload recebido"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "recebido",
+        "processado",
+        "erro"
+      ],
+      "default": "recebido",
+      "title": "Status"
+    },
+    "ip_origem": {
+      "type": "string",
+      "title": "IP de origem"
+    },
+    "erro_mensagem": {
+      "type": "string",
+      "title": "Mensagem de erro"
+    },
+    "processado_em": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Processado em"
+    }
+  },
+  "required": [
+    "origem",
+    "evento_tipo"
+  ]
+}

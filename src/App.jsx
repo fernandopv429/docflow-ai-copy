@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Layout from '@/components/Layout';
 import GerarPorEntrevista from '@/pages/GerarPorEntrevista';
 import ModelosReferencia from '@/pages/ModelosReferencia';
+import Webhooks from '@/pages/Webhooks';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -42,6 +43,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Navigate to="/trabalhista/gerar-entrevista" replace />} />
         <Route path="/trabalhista/gerar-entrevista" element={<GerarPorEntrevista />} />
         <Route path="/modelos" element={<ModelosReferencia />} />
+        <Route path="/webhooks" element={<Webhooks />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
