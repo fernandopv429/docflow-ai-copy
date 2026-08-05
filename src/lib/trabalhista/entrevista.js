@@ -178,6 +178,22 @@ const CHAT_SCHEMA = {
           items: { type: 'string' },
           description: 'CEPs mencionados na conversa OU encontrados nos documentos (endereço do reclamante, local de prestação, reclamadas)',
         },
+        cpf: {
+          type: 'string',
+          description: 'CPF do reclamante mencionado na conversa OU encontrado nos documentos anexados (só dígitos ou formatado)',
+        },
+        data_admissao: {
+          type: 'string',
+          description: 'Data de admissão (DD/MM/AAAA) mencionada na conversa OU encontrada nos documentos anexados',
+        },
+        data_rescisao: {
+          type: 'string',
+          description: 'Data de rescisão/demissão (DD/MM/AAAA) mencionada na conversa OU encontrada nos documentos anexados',
+        },
+        salario: {
+          type: 'number',
+          description: 'Salário/remuneração mencionado na conversa OU encontrado nos documentos anexados (valor numérico)',
+        },
       },
       required: ['cnpjs', 'ceps', 'teses'], 
     },
@@ -213,7 +229,7 @@ Peça, quando ainda não informado, os dados NECESSÁRIOS para uma petição com
 
 ATENÇÃO AO FORMATO DAS ENTREVISTAS: o advogado costuma escrever em lista de rótulos. A DATA DE SAÍDA aparece frequentemente rotulada pela própria modalidade da rescisão — ex.: "Sem JUSTA CAUSA: 07/12/2025", "Rescisão indireta: 10/03/2025", "Pedido de demissão: 01/02/2025". Nesses casos, a data é a DATA DE RESCISÃO e o rótulo indica o tipo_dispensa. Nunca diga que a data de rescisão está faltando quando ela aparece nesse formato. Da mesma forma, "Jornada: 12x36 18:30 as 07:30" é a jornada/escala e "Salário: 2148,22" é o salário.
 
-Extraia em "atributos" TUDO o que já for possível inferir da conversa. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, jornada e fatos essenciais. O salário NÃO é obrigatório para liberar a geração — se não for informado, o sistema adota automaticamente o piso salarial da CCT aplicável. Não invente dados.
+Extraia em "atributos" TUDO o que já for possível inferir da conversa E dos documentos anexados (PDF/DOCX lidos por você). Preencha cpf, data_admissao, data_rescisao e salario sempre que constarem do texto ou dos arquivos — mesmo que o advogado não os tenha digitado no chat. Nunca devolva "atributos" vazio quando o relato contiver função, CNPJ, CEP, tomadora, rito ou teses. Considere como teses fatos como dano moral, intervalo reduzido, folgas trabalhadas e jornada extraordinária. Defina "pronto_para_gerar" como true quando o advogado pedir a minuta OU quando já houver identificação do reclamante, função, reclamada, datas do contrato, jornada e fatos essenciais. O salário NÃO é obrigatório para liberar a geração — se não for informado, o sistema adota automaticamente o piso salarial da CCT aplicável. Não invente dados.
 
 MODELOS DE REFERÊNCIA DISPONÍVEIS (o sistema escolherá automaticamente o mais aderente aos atributos):
 ${resumoModelos(modelos)}
@@ -281,7 +297,9 @@ function inferirAtributosEntrevista(transcript) {
       pendencias = pendencias.filter((item) => !item.startsWith('CPF'));
     }
   }
-  const funcao = texto.match(/\b(vigilante|porteiro|controlador(?:a)? de acesso)\b/i)?.[1];
+  const funcaoConhecida = texto.match(/\b(vigilante|porteiro|controlador(?:a)? de acesso)\b/i)?.[1];
+  const funcaoRotulo = texto.match(/\b(?:fun[çc][aã]o|cargo)\s*[:/-]\s*([^\n;,]{2,50})/i)?.[1]?.trim();
+  const funcao = funcaoConhecida || funcaoRotulo;
   const teses = [];
   if (/dano[s]? moral|persegui|ass[eé]dio/i.test(texto)) teses.push('Dano moral');
   if (/intrajornada|intervalo/i.test(texto)) teses.push('Intervalo intrajornada (art. 71 CLT)');
@@ -301,9 +319,24 @@ function inferirAtributosEntrevista(transcript) {
   if (!atributos.cnpjs.length) faltando.push('CNPJ da(s) reclamada(s)');
   if (!/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/.test(texto)) faltando.push('CPF do reclamante');
   const temTempoLaborado = TEMPO_LABORADO_RE.test(texto);
-  if (!/admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto) && !temTempoLaborado) faltando.push('Data de admissão');
-  if (!RESCISAO_RE.test(texto) && !temTempoLaborado) faltando.push('Data de rescisão/demissão');
-  if (!/sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)) faltando.push('Salário (se não informar, será adotado o piso da CCT)');
+  const temAdmissao = temTempoLaborado
+    || /admiss[aã]o\s*:?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /admitid[oa]\s+em\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /contratad[oa]\s+(?:pela\s+\S+\s+)?em\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /\bin[íi]cio\s*(?:em|:)?\s*\d{2}\/\d{2}\/\d{4}/i.test(texto);
+  if (!temAdmissao) faltando.push('Data de admissão');
+  const temRescisao = temTempoLaborado
+    || RESCISAO_RE.test(texto)
+    || /demitid[oa]\s+em\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /dispensad[oa]\s+em\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /desligad[oa]\s+em\s*\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /sa[íi]da\s+(?:em\s*)?\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /rescis[aã]o\s+(?:em\s*)?\d{2}\/\d{2}\/\d{4}/i.test(texto)
+    || /t[eé]rmino\s+(?:em\s*)?\d{2}\/\d{2}\/\d{4}/i.test(texto);
+  if (!temRescisao) faltando.push('Data de rescisão/demissão');
+  const temSalario = /sal[aá]rio\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto)
+    || /remunera[çc][aã]o\s*:?\s*(?:r\$\s*)?[\d.,]+/i.test(texto);
+  if (!temSalario) faltando.push('Salário (se não informar, será adotado o piso da CCT)');
   if (!/(?:escala|hor[aá]rio|jornada)\s*:?/i.test(texto)) faltando.push('Jornada/escala de trabalho');
   // Salário não bloqueia a geração — o piso salarial da CCT é usado como fallback.
   const bloqueantes = faltando.filter((f) => !f.startsWith('Salário'));
@@ -356,6 +389,19 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
     ceps: [...new Set([...(inferido.atributos.ceps || []), ...(ia.ceps || [])])],
     teses: [...new Set([...(inferido.atributos.teses || []), ...(ia.teses || [])])],
   };
+
+  // Reapura "faltando" considerando o que a IA JÁ extraiu (do texto OU de
+  // documentos anexados). O regex puro só enxerga o texto digitado — quando
+  // o advogado anexa a entrevista em PDF, CPF/datas/salário/CNPJ constam do
+  // arquivo mas não do transcript, e o gate bloqueava indevidamente a
+  // geração mesmo com os dados presentes.
+  let faltando = [...(inferido.faltando || [])];
+  if ((atributos.cnpjs || []).length) faltando = faltando.filter((f) => f !== 'CNPJ da(s) reclamada(s)');
+  if (ia.funcao || atributos.funcao) faltando = faltando.filter((f) => f !== 'Função do reclamante');
+  if (ia.cpf) faltando = faltando.filter((f) => f !== 'CPF do reclamante');
+  if (ia.data_admissao) faltando = faltando.filter((f) => f !== 'Data de admissão');
+  if (ia.data_rescisao) faltando = faltando.filter((f) => f !== 'Data de rescisão/demissão');
+  if (ia.salario != null) faltando = faltando.filter((f) => f !== 'Salário (se não informar, será adotado o piso da CCT)');
   const correcoesAutomaticas = [];
   if (inferido.cepsIncompletosComCnpj.length) {
     const dadosOficiais = await enriquecerCnpjs(
@@ -386,7 +432,8 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
     if (cepOficial.length === 8) atributos.ceps = [...new Set([...(atributos.ceps || []), cepOficial])];
   }
 
-  const pronto = Boolean(resposta?.pronto_para_gerar || inferido.essenciais) && !inferido.pendencias.length;
+  const bloqueantesFaltando = faltando.filter((f) => !f.startsWith('Salário'));
+  const pronto = Boolean(resposta?.pronto_para_gerar || !bloqueantesFaltando.length) && !inferido.pendencias.length;
   let reply = resposta?.reply || 'Dados recebidos e analisados.';
   if (inferido.pendencias.length) {
     reply = `Identifiquei dados que precisam ser corrigidos antes de gerar a minuta:\n\n${inferido.pendencias.map((item) => `• ${item}`).join('\n')}`;
@@ -400,7 +447,6 @@ export async function conversarEntrevista({ transcript, fileUrls, modelos, attrs
       .map((d) => `• ${d.razao_social} — CNPJ ${d.cnpj}, ${d.endereco}, CEP ${d.cep}`)
       .join('\n')}`;
   }
-  const faltando = inferido.faltando || [];
   if (faltando.length && !inferido.pendencias.length) {
     reply += `\n\nAinda falta: ${faltando.join('; ')}.`;
   }
