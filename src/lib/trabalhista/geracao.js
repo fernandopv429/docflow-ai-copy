@@ -46,7 +46,7 @@ import {
 // o template (.docx) e o preview. A IA NÃO gera documento —
 // apenas extrai dados e os poucos trechos livres do caso (parser).
 // ============================================================
-export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA = false } = {}) {
+export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA = false, casoPreMapeado = null } = {}) {
   const notify = (msg) => {
     try {
       onTool?.(msg);
@@ -76,24 +76,31 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
     if (termos.length) notify(`Consultando DataJud/CNJ (${config.datajud_tribunal || 'trt2'}): ${termos.join(', ')}...`);
   }
   const temMaterial = Boolean((textoParaExtracao && textoParaExtracao.trim()) || urlsVisao.length);
-  if (temMaterial) notify('Extraindo dados do caso e calculando verbas (determinístico)...');
+  const temCasoPreMapeado = Boolean(casoPreMapeado && Object.keys(casoPreMapeado).length);
+  if (temCasoPreMapeado) {
+    notify('Dados estruturados do webhook aplicados — pulando extração por IA...');
+  } else if (temMaterial) {
+    notify('Extraindo dados do caso e calculando verbas (determinístico)...');
+  }
   const [dadosReceita, dadosCep, dadosDatajud, extracao] = await Promise.all([
     enriquecerCnpjs(cnpjs),
     enriquecerCeps(ceps),
     enriquecerDatajud(attrs, config),
-    temMaterial
-      ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 5, texto: textoParaExtracao || '', fileUrls: urlsVisao }), () => extrairCasoDeTexto(textoParaExtracao || '', urlsVisao), {
-          onHit: () => notify('Reutilizando análise estruturada da entrevista em cache (v5)...'),
-        }).catch(() => ({ caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Falha na extração estruturada.' }] }))
-      : Promise.resolve({ caso: {}, alertas: [] }),
+    temCasoPreMapeado
+      ? Promise.resolve({ caso: {}, alertas: [] })
+      : temMaterial
+        ? withRuntimeCache('extracao-caso', runtimeCacheKey({ v: 5, texto: textoParaExtracao || '', fileUrls: urlsVisao }), () => extrairCasoDeTexto(textoParaExtracao || '', urlsVisao), {
+            onHit: () => notify('Reutilizando análise estruturada da entrevista em cache (v5)...'),
+          }).catch(() => ({ caso: {}, alertas: [{ severidade: 'BLOQUEANTE', descricao: 'Falha na extração estruturada.' }] }))
+        : Promise.resolve({ caso: {}, alertas: [] }),
   ]);
-  const caso = extracao?.caso || {};
-  const alertasExtracao = extracao?.alertas || [];
+  const caso = temCasoPreMapeado ? { ...casoPreMapeado } : (extracao?.caso || {});
+  const alertasExtracao = temCasoPreMapeado ? [] : (extracao?.alertas || []);
 
   // FALLBACK determinístico (regex): quando a IA devolve o caso vazio ou com
   // lacunas, extrai os campos básicos diretamente do texto da entrevista.
   // A IA continua prioritária — o regex só preenche o que estiver faltando.
-  const casoDet = temMaterial ? extrairDeterministico(textoParaExtracao) : {};
+  const casoDet = (temMaterial && !temCasoPreMapeado) ? extrairDeterministico(textoParaExtracao) : {};
   const camposDet = Object.keys(casoDet);
   let preenchidosDet = 0;
   for (const k of camposDet) {
@@ -109,7 +116,9 @@ export async function gerarDadosPeca({ texto, fileUrls, attrs, onTool, redigirIA
   const camposIA = Object.keys(caso).length;
   const camposDeterministicos = Object.keys(casoDet).length;
   if (preenchidosDet > 0) notify(`Fallback determinístico (regex) preencheu ${preenchidosDet} campos adicionais.`);
-  if (camposIA === 0 && camposDeterministicos === 0) {
+  if (temCasoPreMapeado) {
+    notify(`Dados estruturados do webhook aplicados (${Object.keys(caso).length} campos). Consultando fontes oficiais e calculando verbas...`);
+  } else if (camposIA === 0 && camposDeterministicos === 0) {
     notify('⚠ Nenhum dado extraído do documento. Verifique se o PDF contém texto selecionável ou tente novamente — o documento pode ter sido processado como imagem pela IA de visão.');
   } else {
     notify(`Extração concluída: ${camposIA} campos via IA de visão, ${preenchidosDet} campos via fallback regex.`);

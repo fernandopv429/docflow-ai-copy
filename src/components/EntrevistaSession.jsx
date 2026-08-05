@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText, AlertTriangle,
+  ArrowLeft, Loader2, Paperclip, Send, X, FileText, Bot, FileDown, Library, RefreshCw, CheckCircle2, ScrollText, AlertTriangle, Inbox,
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import ToolTraceMessage from '@/components/ToolTraceMessage';
@@ -22,6 +22,8 @@ import {
   textoDaPeca,
 } from '@/lib/trabalhista/previewTemplate';
 import ConfirmacaoGeracao from '@/components/ConfirmacaoGeracao';
+import FilaWebhooks from '@/components/FilaWebhooks';
+import { mapearCasoDeWebhook } from '@/lib/trabalhista/mapearWebhook';
 
 // ============================================================
 // Instância isolada do agente de entrevista.
@@ -51,6 +53,8 @@ export default function EntrevistaSession({ sessionId, active = true }) {
   const [attrs, setAttrs] = useState(null);
   const [config, setConfig] = useState(null);
   const [ultimaGeracao, setUltimaGeracao] = useState(null);
+  const [filaOpen, setFilaOpen] = useState(false);
+  const [filaCount, setFilaCount] = useState(0);
 
   // Documento vivo (painel à direita) — preview do template .docx preenchido
   const [docHtml, setDocHtml] = useState('');
@@ -61,6 +65,13 @@ export default function EntrevistaSession({ sessionId, active = true }) {
   useEffect(() => {
     base44.entities.IntegracaoConfig.list('-updated_date', 1).then((l) => setConfig(l?.[0] || null)).catch(() => {});
   }, []);
+
+  const atualizarFilaCount = () => {
+    base44.entities.WebhookEvento.filter({ evento_tipo: 'entrevista.salva', status: 'recebido' }, '-created_date', 100)
+      .then((l) => setFilaCount(l?.length || 0))
+      .catch(() => {});
+  };
+  useEffect(() => { atualizarFilaCount(); }, []);
 
   useEffect(() => {
     if (active) endRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -108,6 +119,7 @@ export default function EntrevistaSession({ sessionId, active = true }) {
         texto: geracaoTexto,
         fileUrls: opts.urls ?? allUrls,
         attrs: opts.attrs ?? attrs,
+        casoPreMapeado: opts.casoPreMapeado ?? null,
         redigirIA: true,
         onTool: (msg) => setMessages((m) => [...m, { role: 'tool', text: msg }]),
       });
@@ -266,6 +278,22 @@ export default function EntrevistaSession({ sessionId, active = true }) {
     }
   };
 
+  const abrirCasoWebhook = async (evento) => {
+    const data = evento?.payload?.data;
+    if (!data) return;
+    const caso = mapearCasoDeWebhook(data);
+    const nome = data.nome_cliente || 'Caso do webhook';
+    const texto = data.fatos_narrados || `Caso recebido via webhook — ${nome}`;
+    setFilaOpen(false);
+    setMessages([
+      { role: 'user', text: `📋 Caso recebido via webhook — ${nome}` },
+      { role: 'assistant', text: 'Gerando a petição com os dados estruturados (sem reextração por IA)...' },
+    ]);
+    base44.entities.WebhookEvento.update(evento.id, { status: 'processado', processado_em: new Date().toISOString() }).catch(() => {});
+    atualizarFilaCount();
+    await gerarMinuta({ texto, casoPreMapeado: caso, attrs: caso, urls: [] });
+  };
+
   const confirmarGeracao = async (pending, msgIndex) => {
     setMessages((m) => m.map((msg, i) => (i === msgIndex ? { ...msg, status: 'aprovado' } : msg)));
     await gerarMinuta(pending);
@@ -307,6 +335,18 @@ export default function EntrevistaSession({ sessionId, active = true }) {
           title="Ver logs da sessão"
         >
           <ScrollText className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => setFilaOpen(true)}
+          className="relative p-2 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full"
+          title="Fila de entrevistas (webhook)"
+        >
+          <Inbox className="w-4 h-4" />
+          {filaCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#1a73e8] text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+              {filaCount}
+            </span>
+          )}
         </button>
         <Link to="/modelos" className="flex items-center gap-1.5 text-xs text-[#1a73e8] hover:underline whitespace-nowrap">
           <Library className="w-3.5 h-3.5" /> Configurações
@@ -525,6 +565,7 @@ export default function EntrevistaSession({ sessionId, active = true }) {
           </div>
         </div>
       </div>
+      <FilaWebhooks open={filaOpen} onOpenChange={setFilaOpen} onSelecionar={abrirCasoWebhook} />
       <SessionLogsModal open={logsOpen} onOpenChange={setLogsOpen} messages={[...messages, ...consoleLogs]} />
     </div>
   );
