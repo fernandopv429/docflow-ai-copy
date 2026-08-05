@@ -31,6 +31,48 @@ import { montarDadosTemplate } from '@/lib/trabalhista/dadosTemplate';
 // atributos e rascunho próprios — sem compartilhar contexto com
 // as demais sessões. Toda a lógica do agente é idêntica à original.
 // ============================================================
+// Serializa o caso estruturado de um webhook num texto rótulo:valor que a IA
+// de entrevista e o regex de "faltando" reconhecem (Nome, CPF, Função,
+// Admissão, Rescisão, Salário, CNPJ, Jornada...). O caso do webhook vive em
+// analise_json.caso — o entrevista_texto costuma vir vazio, sem isto o chat
+// não enxerga os dados ao processar uma correção.
+const TIPO_DISPENSA_CURTO = {
+  sem_justa_causa: 'Sem justa causa',
+  rescisao_indireta: 'Rescisão indireta',
+  nulidade_pedido_demissao: 'Pedido de demissão',
+  reversao_justa_causa: 'Reversão de justa causa',
+  acordo: 'Acordo',
+};
+function dataIsoParaBr(iso) {
+  if (!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso);
+}
+function serializarCasoWebhook(caso = {}) {
+  const linhas = [];
+  if (caso.recl_nome) linhas.push(`Nome: ${caso.recl_nome}`);
+  if (caso.recl_cpf) linhas.push(`CPF: ${caso.recl_cpf}`);
+  if (caso.recl_rg) linhas.push(`RG: ${caso.recl_rg}`);
+  if (caso.recl_pis) linhas.push(`PIS: ${caso.recl_pis}`);
+  if (caso.recl_ctps) linhas.push(`CTPS: ${caso.recl_ctps}`);
+  if (caso.recl_endereco) linhas.push(`Endereço: ${caso.recl_endereco}`);
+  if (caso.funcao) linhas.push(`Função: ${caso.funcao}`);
+  if (caso.data_admissao) linhas.push(`Admissão: ${dataIsoParaBr(caso.data_admissao)}`);
+  if (caso.data_rescisao) linhas.push(`Rescisão: ${dataIsoParaBr(caso.data_rescisao)}`);
+  if (caso.salario != null) linhas.push(`Salário: ${caso.salario}`);
+  if (caso.tipo_dispensa) linhas.push(`Modalidade: ${TIPO_DISPENSA_CURTO[caso.tipo_dispensa] || caso.tipo_dispensa}`);
+  if (caso.jornada_horario) linhas.push(`Jornada: ${caso.jornada_horario}`);
+  if (caso.escala) linhas.push(`Escala: ${caso.escala}`);
+  if (caso.recl1_nome) linhas.push(`1ª Reclamada: ${caso.recl1_nome}`);
+  if (caso.recl1_cnpj) linhas.push(`CNPJ: ${caso.recl1_cnpj}`);
+  if (caso.recl1_logradouro) linhas.push(`Endereço da reclamada: ${caso.recl1_logradouro}`);
+  if (caso.recl2_nome) linhas.push(`2ª Reclamada: ${caso.recl2_nome}`);
+  if (caso.recl2_cnpj) linhas.push(`CNPJ tomadora: ${caso.recl2_cnpj}`);
+  if (caso.local_prestacao) linhas.push(`Local de prestação: ${caso.local_prestacao}`);
+  if (caso.dano_fatos) linhas.push(`Dano moral: ${caso.dano_fatos}`);
+  return linhas.join('\n');
+}
+
 export default function EntrevistaSession({ sessionId, active = true }) {
   const SK_TEXT = `docflow:entrevista-texto:${sessionId}`;
   const SK_CASE = `docflow:caso-rascunho-id:${sessionId}`;
@@ -226,8 +268,14 @@ export default function EntrevistaSession({ sessionId, active = true }) {
       const transcriptBase = novasMsgs
         .filter((m) => m.role === 'user' || m.role === 'assistant')
         .map((m) => ({ role: m.role, text: m.text || '' }));
-      const transcript = casoWebhook?.entrevista_texto
-        ? [{ role: 'user', text: casoWebhook.entrevista_texto }, ...transcriptBase]
+      // Caso de webhook: injeta os dados estruturados do caso (serializados)
+      // como contexto no transcript — a IA e o regex de "faltando" passam a
+      // enxergar os dados do caso ao processar uma correção.
+      const contextoWebhook = casoWebhook
+        ? [casoWebhook.entrevista_texto, serializarCasoWebhook(casoWebhook.caso)].filter(Boolean).join('\n\n')
+        : '';
+      const transcript = contextoWebhook
+        ? [{ role: 'user', text: contextoWebhook }, ...transcriptBase]
         : transcriptBase;
       const res = await conversarEntrevista({
         transcript,
