@@ -1,9 +1,13 @@
 // ============================================================
 // Mapeamento determinístico do payload do webhook (evento
-// "entrevista.salva") para o objeto `caso` usado pelo motor de
-// geração (dadosTemplate/mathUtils). Como o webhook já entrega
-// dados estruturados, o motor pula a extração por IA e usa este
-// caso direto — mais rápido, mais barato e sem risco de reextração.
+// "entrevista.salva", disparado pelo app Entrevista Digital) para
+// o objeto `caso` usado pelo motor de geração (dadosTemplate/mathUtils).
+// Cópia frontend de base44/shared/mapearWebhook.js — manter em sincronia.
+//
+// Contrato de entrada = campos do entity `Entrevista` do app
+// "Entrevista Digital" (RECL_NOME, RECL1_NOME, DATA_ADMISSAO, FUNCAO,
+// escala, etc. — nomes de tag, não nomes de banco). Se o formulário
+// mudar de novo, ajustar aqui.
 // ============================================================
 
 function parseBRL(s) {
@@ -25,8 +29,14 @@ function normalizarData(s) {
   return s;
 }
 
+const TIPOS_DISPENSA_VALIDOS = [
+  'sem_justa_causa', 'rescisao_indireta', 'nulidade_pedido_demissao', 'reversao_justa_causa', 'acordo',
+];
+
 function mapearTipoDispensa(s) {
-  const t = String(s || '').toLowerCase().trim();
+  const raw = String(s || '').toLowerCase().trim();
+  if (TIPOS_DISPENSA_VALIDOS.includes(raw)) return raw; // já vem no enum canônico do formulário
+  const t = raw.replace(/_/g, ' '); // aceita também texto livre/rótulo humano
   if (/sem\s+justa\s+causa/.test(t)) return 'sem_justa_causa';
   if (/rescis[aã]o\s+indireta/.test(t)) return 'rescisao_indireta';
   if (/coa[çc][aã]o|coagido|nulidade|pedido\s+de\s+demiss[aã]o/.test(t)) return 'nulidade_pedido_demissao';
@@ -47,14 +57,18 @@ function parseRange(s) {
 function extrairUF(end) {
   const s = String(end || '');
   const m = /,\s*([A-Z]{2})\s*,\s*CEP/i.exec(s) || /\/([A-Z]{2})\b/.exec(s);
-  return m ? m[1] : '';
+  return m ? m[1].toUpperCase() : '';
 }
 
-function inferirGenero(d) {
-  const ec = String(d.estado_civil || '').toLowerCase().trim();
+function inferirGenero(estadoCivil) {
+  const ec = String(estadoCivil || '').toLowerCase().trim();
   if (/a$/.test(ec)) return 'F';
   if (/o$/.test(ec)) return 'M';
   return 'M';
+}
+
+function juntarEndereco(logradouro, complemento) {
+  return [logradouro, complemento].filter(Boolean).join(', ');
 }
 
 export function mapearCasoDeWebhook(data) {
@@ -63,44 +77,42 @@ export function mapearCasoDeWebhook(data) {
   const caso = {};
 
   // Reclamante
-  caso.recl_nome = d.nome_cliente || '';
-  caso.recl_nacionalidade = d.nacionalidade || '';
-  caso.recl_estado_civil = d.estado_civil || '';
-  caso.recl_rg = d.rg || '';
-  caso.recl_cpf = d.cpf || '';
-  caso.recl_pis = d.pis || '';
-  if (d.ctps) {
-    const m = /(\d+)\s*,?\s*s[ée]rie\s*(\d+)/i.exec(d.ctps);
-    if (m) { caso.recl_ctps = m[1]; caso.recl_serie = m[2]; }
-    else caso.recl_ctps = d.ctps;
-  }
-  caso.recl_nascimento = normalizarData(d.data_nascimento);
-  caso.recl_filiacao = d.filiacao || '';
-  caso.recl_endereco = d.endereco_cliente || '';
+  caso.recl_nome = d.RECL_NOME || '';
+  caso.recl_nacionalidade = d.RECL_NACIONALIDADE || '';
+  caso.recl_estado_civil = d.RECL_ESTADOCIVIL || '';
+  caso.recl_rg = d.RECL_RG || '';
+  caso.recl_cpf = d.RECL_CPF || '';
+  caso.recl_pis = d.RECL_PIS || '';
+  caso.recl_ctps = d.RECL_CTPS || '';
+  caso.recl_serie = d.RECL_SERIE || '';
+  caso.recl_nascimento = normalizarData(d.RECL_NASC);
+  caso.recl_filiacao = d.RECL_FILIACAO || '';
+  caso.recl_endereco = d.RECL_CEP ? `${d.RECL_ENDERECO || ''}, CEP ${d.RECL_CEP}` : (d.RECL_ENDERECO || '');
   caso.recl_email = d.email || '';
-  caso.recl_genero = inferirGenero(d);
+  caso.recl_genero = inferirGenero(d.RECL_ESTADOCIVIL);
 
-  // Reclamadas
-  const r1 = (d.reclamadas && d.reclamadas[0]) || {};
-  const r2 = (d.reclamadas && d.reclamadas[1]) || {};
-  caso.recl1_nome = r1.razao_social || '';
-  caso.recl1_cnpj = r1.cnpj || '';
-  caso.recl1_logradouro = r1.endereco || '';
-  caso.recl2_nome = r2.razao_social || '';
-  caso.recl2_cnpj = r2.cnpj || '';
-  caso.recl2_logradouro = r2.endereco || '';
-  // Local de prestação = tomadora (2ª reclamada) quando houver
-  caso.local_prestacao = r2.endereco || r1.endereco || '';
+  // Reclamadas (o formulário atual é plano — sem array `reclamadas`)
+  caso.recl1_nome = d.RECL1_NOME || '';
+  caso.recl1_cnpj = d.RECL1_CNPJ || '';
+  caso.recl1_logradouro = juntarEndereco(d.RECL1_LOGRADOURO, d.RECL1_ENDCOMPL);
+  caso.recl2_nome = d.RECL2_NOME || '';
+  caso.recl2_cnpj = d.RECL2_CNPJ || '';
+  caso.recl2_logradouro = juntarEndereco(d.RECL2_LOGRADOURO, d.RECL2_ENDCOMPL);
+  caso.recl3_nome = d.RECL3_NOME || '';
+  caso.recl3_cnpj = d.RECL3_CNPJ || '';
+  // Local de prestação = tomadora (2ª reclamada) quando houver, senão empregadora
+  caso.local_prestacao = caso.recl2_logradouro || caso.recl1_logradouro || '';
 
   // Contrato
-  caso.data_admissao = normalizarData(d.admissao);
-  caso.data_rescisao = normalizarData(d.demissao || d.ultimo_dia);
-  caso.salario = parseBRL(d.salario);
-  caso.funcao = r1.cargo || d.cargo || '';
+  caso.data_admissao = normalizarData(d.DATA_ADMISSAO);
+  caso.data_rescisao = normalizarData(d.DATA_RESCISAO);
+  caso.salario = parseBRL(d.salario ?? d.SALARIO); // form atual não pede salário; vira piso normativo da CCT (enriquecerCct)
+  caso.funcao = d.FUNCAO || '';
   caso.tipo_dispensa = mapearTipoDispensa(d.tipo_dispensa);
 
   // Jornada
-  caso.escala = r1.escala || d.escala || '';
+  caso.escala = d.escala || '';
+  caso.jornada_horario = d.JORNADA_HORARIO || '';
   if (d.horas_extras) {
     caso.jornada_extrapola = true;
     caso.jornada_freq_extra = d.media_horas_extras || '';
@@ -109,37 +121,35 @@ export function mapearCasoDeWebhook(data) {
   }
   if (d.intervalo_suprimido) {
     caso.intervalo_gozado = false;
-    caso.intervalo_usufruido = d.intervalo_detalhes || '';
+    caso.intervalo_usufruido = d.INTERVALO_GOZADO || '';
   }
 
   // Folgas trabalhadas (FT)
   if (d.folgas_trabalhadas || d.finais_semana) {
     caso.tem_ft = true;
-    caso.ft_qtd_media = parseRange(d.ft_quantidade);
+    caso.ft_qtd_media = parseRange(d.FT_QTD_MEDIA);
+    caso.val_ft = parseRange(d.VAL_FT);
   }
   if (d.ft_pagamento && /pix|dinheiro/i.test(d.ft_pagamento)) {
     caso.tem_integracao_por_fora = true;
   }
 
-  // Acúmulo / desvio
+  // Acúmulo de função
   if (d.acumulo_funcao) {
     caso.tem_acumulo = true;
     caso.acumulo_atividades = d.funcoes_acumuladas || '';
   }
 
   // Adicionais
-  if (d.periculosidade) caso.tem_periculosidade = true;
-  if (d.insalubridade) caso.tem_insalubridade = true;
-  if (d.adicional_noturno) caso.tem_adic_noturno = true;
+  if (d.tem_periculosidade) caso.tem_periculosidade = true;
+  if (d.tem_insalubridade) caso.tem_insalubridade = true;
 
   // Benefícios
   if (d.vale_transporte) caso.tem_vale_transporte = true;
-  if (d.vale_alimentacao) caso.tem_auxilio_alimentacao = true;
+  if (d.vale_alimentacao || d.vale_refeicao) caso.tem_auxilio_alimentacao = true;
 
-  // Doença / estabilidade
-  if (d.doenca_acidente) caso.tem_doenca = true;
-
-  // Gratificação
+  // Doença / gratificação
+  if (d.tem_doenca) caso.tem_doenca = true;
   if (d.gratificacao) caso.tem_gratificacao = true;
 
   // Textos livres (fatos narrados → entrevista + dano moral)
@@ -147,7 +157,7 @@ export function mapearCasoDeWebhook(data) {
   caso.dano_fatos = d.fatos_narrados || '';
 
   // Comarca/UF (inferida do endereço da tomadora/empregadora)
-  caso.comarca_uf = extrairUF(r2.endereco || r1.endereco || d.endereco_cliente);
+  caso.comarca_uf = extrairUF(caso.recl2_logradouro || caso.recl1_logradouro || caso.recl_endereco);
 
   return caso;
 }
