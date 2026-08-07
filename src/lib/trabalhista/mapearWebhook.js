@@ -132,6 +132,9 @@ export function mapearCasoDeWebhook(data) {
   }
   if (d.ft_pagamento && /pix|dinheiro/i.test(d.ft_pagamento)) {
     caso.tem_integracao_por_fora = true;
+    // Regra do escritório (mesma do parser por IA, parserEntrevista.js): FT paga
+    // informalmente = valor "por fora" (mesma origem, dois pontos do texto).
+    if (caso.val_ft) caso.valor_por_fora = caso.val_ft;
   }
 
   // Acúmulo de função
